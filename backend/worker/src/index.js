@@ -1,3 +1,4 @@
+import { ADMIN_HTML } from "./admin_html.js";
 // Private Games API (Cloudflare Worker + D1).
 const json = (o, status = 200) => new Response(JSON.stringify(o), {
   status, headers: { "content-type": "application/json", "access-control-allow-origin": "*",
@@ -12,6 +13,7 @@ export default {
     const url = new URL(req.url); const p = url.pathname;
     if (req.method === "OPTIONS") return json({});
     try {
+      if (p === "/admin") return new Response(ADMIN_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
       if (p === "/" || p === "/health") {
         let db = "missing binding (DB)";
         if (env.DB) { try { await env.DB.prepare("SELECT 1").first(); db = "ok"; } catch (e) { db = "error: " + e; } }
