@@ -1,3 +1,4 @@
+import { LEGAL_DEFAULT } from "./legal_default.js";
 import { ADMIN_HTML } from "./admin_html.js";
 // Private Games API (Cloudflare Worker + D1).
 const json = (o, status = 200) => new Response(JSON.stringify(o), {
@@ -27,8 +28,8 @@ export default {
         if (existing) return json({ error: "already registered" }, 409);
         const token = crypto.randomUUID() + crypto.randomUUID();
         try {
-          await env.DB.prepare("INSERT INTO users (user_id,name,username,email,phone,token_hash,platform,model,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
-            .bind(b.user_id, b.name, b.username, b.email || null, b.phone || null, await sha(token), b.platform || null, b.model || null, Date.now()).run();
+          await env.DB.prepare("INSERT INTO users (user_id,name,username,email,phone,token_hash,platform,model,created_at,terms_version,terms_at,app_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+            .bind(b.user_id, b.name, b.username, b.email || null, b.phone || null, await sha(token), b.platform || null, b.model || null, Date.now(), b.terms_version || null, b.terms_version ? Date.now() : null, b.app_version || null).run();
         } catch (e) { return json({ error: "username taken" }, 409); }
         return json({ ok: true, token }, 201);
       }
@@ -41,12 +42,49 @@ export default {
         const mine = await env.DB.prepare("SELECT patch FROM user_profile WHERE user_id=?").bind(u.user_id).first();
         return json(merge(JSON.parse(bc?.patch || "{}"), JSON.parse(mine?.patch || "{}")));
       }
+      // ---- public: current legal text
+      if (p === "/v1/legal" && req.method === "GET") {
+        let r = await env.DB.prepare("SELECT version,terms,privacy FROM legal WHERE id=1").first();
+        if (!r) {
+          await env.DB.prepare("INSERT OR IGNORE INTO legal (id,version,terms,privacy,updated) VALUES (1,1,?,?,?)").bind(LEGAL_DEFAULT.terms, LEGAL_DEFAULT.privacy, Date.now()).run();
+          r = { version: 1, terms: LEGAL_DEFAULT.terms, privacy: LEGAL_DEFAULT.privacy };
+        }
+        return json(r);
+      }
+      // ---- app (needs token): progress, reports, notifications, consent
+      if (p.startsWith("/v1/me/") && p !== "/v1/me/profile") {
+        const u = await env.DB.prepare("SELECT user_id, disabled FROM users WHERE token_hash=?").bind(await sha(bearer(req))).first();
+        if (!u || u.disabled) return json({ error: "unauthorized" }, 401);
+        const now = Date.now();
+        if (p === "/v1/me/sync" && req.method === "POST") {
+          const b = await req.json();
+          await env.DB.prepare("UPDATE users SET progress=?, points=?, last_level=COALESCE(?,last_level), last_played=COALESCE(?,last_played), app_version=?, content_version=?, last_seen=? WHERE user_id=?")
+            .bind(JSON.stringify({ completed: b.completed || [], inventory: b.inventory || [] }), b.points | 0, b.last_level || null, b.last_level ? now : null, String(b.app_version || ""), b.content_version | 0, now, u.user_id).run();
+          return json({ ok: true });
+        }
+        if (p === "/v1/me/report" && req.method === "POST") {
+          const b = await req.json();
+          await env.DB.prepare("INSERT INTO reports (user_id,kind,message,logs,level,device,app_version,content_version,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+            .bind(u.user_id, b.kind === "crash" ? "crash" : "bug", String(b.message || "").slice(0, 4000), String(b.logs || "").slice(-60000), b.level || null, String(b.device || "").slice(0, 200), String(b.app_version || ""), b.content_version | 0, now).run();
+          return json({ ok: true }, 201);
+        }
+        if (p === "/v1/me/notifications" && req.method === "GET") {
+          const after = parseInt(url.searchParams.get("after") || "0") | 0;
+          const r = await env.DB.prepare("SELECT id,title,body,created_at FROM notifications WHERE id>? AND (user_id IS NULL OR user_id=?) ORDER BY id LIMIT 50").bind(after, u.user_id).all();
+          return json(r.results);
+        }
+        if (p === "/v1/me/consent" && req.method === "POST") {
+          const b = await req.json();
+          await env.DB.prepare("UPDATE users SET terms_version=?, terms_at=? WHERE user_id=?").bind(b.terms_version | 0, now, u.user_id).run();
+          return json({ ok: true });
+        }
+      }
       // ---- admin
       if (p.startsWith("/v1/admin/")) {
         if (!env.ADMIN_TOKEN || bearer(req) !== env.ADMIN_TOKEN) return json({ error: "unauthorized" }, 401);
         if (p === "/v1/admin/users" && req.method === "GET") {
           const q = url.searchParams.get("q"); const like = `%${q || ""}%`;
-          const r = await env.DB.prepare("SELECT user_id,name,username,email,phone,platform,model,created_at,last_seen,disabled FROM users WHERE name LIKE ?1 OR username LIKE ?1 OR email LIKE ?1 OR phone LIKE ?1 OR user_id LIKE ?1 ORDER BY created_at DESC LIMIT 200").bind(like).all();
+          const r = await env.DB.prepare("SELECT user_id,name,username,email,phone,platform,model,created_at,last_seen,disabled,progress,points,last_level,last_played,terms_version,terms_at,app_version,content_version FROM users WHERE name LIKE ?1 OR username LIKE ?1 OR email LIKE ?1 OR phone LIKE ?1 OR user_id LIKE ?1 ORDER BY created_at DESC LIMIT 200").bind(like).all();
           return json(r.results);
         }
         let m;
@@ -58,12 +96,44 @@ export default {
             return json({ ok: true });
           }
         }
+        if (p === "/v1/admin/reports" && req.method === "GET") {
+          const st = url.searchParams.get("status") === "all" ? "" : "WHERE r.resolved=0";
+          const r = await env.DB.prepare(`SELECT r.id,r.user_id,u.name,u.username,r.kind,r.message,r.logs,r.level,r.device,r.app_version,r.content_version,r.created_at,r.resolved FROM reports r LEFT JOIN users u ON u.user_id=r.user_id ${st} ORDER BY r.id DESC LIMIT 100`).all();
+          return json(r.results);
+        }
+        if ((m = p.match(/^\/v1\/admin\/reports\/(\d+)$/)) && req.method === "PUT") {
+          const b = await req.json();
+          await env.DB.prepare("UPDATE reports SET resolved=? WHERE id=?").bind(b.resolved ? 1 : 0, m[1]).run();
+          return json({ ok: true });
+        }
+        if (p === "/v1/admin/notifications" && req.method === "GET") {
+          const r = await env.DB.prepare("SELECT n.id,n.user_id,u.name,n.title,n.body,n.created_at FROM notifications n LEFT JOIN users u ON u.user_id=n.user_id ORDER BY n.id DESC LIMIT 50").all();
+          return json(r.results);
+        }
+        if (p === "/v1/admin/notifications" && req.method === "POST") {
+          const b = await req.json();
+          if (!b.title) return json({ error: "title required" }, 400);
+          await env.DB.prepare("INSERT INTO notifications (user_id,title,body,created_at) VALUES (?,?,?,?)").bind(b.user_id || null, String(b.title).slice(0, 120), String(b.body || "").slice(0, 1000), Date.now()).run();
+          return json({ ok: true }, 201);
+        }
+        if (p === "/v1/admin/legal" && req.method === "PUT") {
+          const b = await req.json();
+          const cur = await env.DB.prepare("SELECT version FROM legal WHERE id=1").first();
+          const v = (cur?.version || 0) + 1;
+          await env.DB.prepare("INSERT INTO legal (id,version,terms,privacy,updated) VALUES (1,?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET version=?1, terms=?2, privacy=?3, updated=?4").bind(v, b.terms || "", b.privacy || "", Date.now()).run();
+          await env.DB.prepare("INSERT INTO notifications (user_id,title,body,created_at) VALUES (NULL,?,?,?)").bind("Terms & Privacy updated", "We updated our Terms and Privacy Policy. Please review and accept them to keep playing.", Date.now()).run();
+          return json({ ok: true, version: v });
+        }
         if (p === "/v1/admin/stats" && req.method === "GET") {
           const now = Date.now();
           const t = await env.DB.prepare("SELECT COUNT(*) total, SUM(created_at>?1) new24h, SUM(last_seen>?2) active7d, SUM(disabled) disabled FROM users").bind(now - 864e5, now - 6048e5).first();
           const pl = await env.DB.prepare("SELECT COALESCE(platform,'unknown') k, COUNT(*) v FROM users GROUP BY 1").all();
           const rc = await env.DB.prepare("SELECT name,username,created_at FROM users ORDER BY created_at DESC LIMIT 6").all();
-          return json({ total: t.total || 0, new24h: t.new24h || 0, active7d: t.active7d || 0, disabled: t.disabled || 0,
+          const op = await env.DB.prepare("SELECT COUNT(*) c FROM reports WHERE resolved=0").first();
+          const pr = await env.DB.prepare("SELECT progress FROM users WHERE progress IS NOT NULL").all();
+          const levels = {};
+          for (const r of pr.results) { try { for (const l of JSON.parse(r.progress).completed || []) levels[l] = (levels[l] || 0) + 1; } catch (e) {} }
+          return json({ open_reports: op.c || 0, levels, total: t.total || 0, new24h: t.new24h || 0, active7d: t.active7d || 0, disabled: t.disabled || 0,
             platforms: Object.fromEntries(pl.results.map(r => [r.k, r.v])), recent: rc.results });
         }
         if ((m = p.match(/^\/v1\/admin\/users\/(PG-[A-Z0-9]{8})\/status$/)) && req.method === "PUT") {

@@ -46,12 +46,15 @@ input[type=color]{height:44px;padding:4px;width:90px}
 
 <div id="app" class="hide">
  <header><div class="brand"><i>✡</i> Private Games</div>
-  <nav id="nav"><button data-t="overview" class="on">Overview</button><button data-t="users">Players</button><button data-t="broadcast">Send to everyone</button><button data-t="updates">App updates</button></nav>
+  <nav id="nav"><button data-t="overview" class="on">Overview</button><button data-t="users">Players</button><button data-t="reports">Problems <span id="rbadge" class="tag off hide"></span></button><button data-t="broadcast">Send to everyone</button><button data-t="notes">Notifications</button><button data-t="legal">Terms</button><button data-t="updates">App updates</button></nav>
   <button class="ghost" id="out">Sign out</button></header>
  <main>
   <section id="t-overview"></section>
   <section id="t-users" class="hide"></section>
+  <section id="t-reports" class="hide"></section>
   <section id="t-broadcast" class="hide"></section>
+  <section id="t-notes" class="hide"></section>
+  <section id="t-legal" class="hide"></section>
   <section id="t-updates" class="hide"></section>
  </main>
 </div>
@@ -69,18 +72,23 @@ async function enter(){try{await call("/v1/admin/stats");sessionStorage.setItem(
 $("#go").onclick=()=>{TOKEN=$("#pw").value;enter()};$("#pw").onkeydown=e=>{if(e.key==="Enter")$("#go").click()};
 $("#out").onclick=()=>{sessionStorage.removeItem("pgt");location.reload()};
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>show(b.dataset.t));
-function show(t){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));["overview","users","broadcast","updates"].forEach(x=>$("#t-"+x).classList.toggle("hide",x!==t));({overview,users,broadcast,updates})[t]()}
+function show(t){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));["overview","users","reports","broadcast","notes","legal","updates"].forEach(x=>$("#t-"+x).classList.toggle("hide",x!==t));({overview,users,reports,broadcast,notes,legal,updates})[t]()}
 
 async function overview(){const s=await call("/v1/admin/stats");const total=s.total||1;
  const plat=Object.entries(s.platforms||{}).map(([k,v])=>`<div style="margin:10px 0"><div class="row"><span>${esc(k)}</span><span class="sp"></span><span class="dim">${v}</span></div><div class="bar"><i style="width:${v/total*100}%"></i></div></div>`).join("")||'<p class="dim">No players yet.</p>';
  const recent=(s.recent||[]).map(u=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><div class="av" style="width:34px;height:34px;font-size:14px">${esc(u.name[0]||"?")}</div><div><b>${esc(u.name)}</b> <span class="dim">@${esc(u.username)}</span></div><span class="sp"></span><span class="dim">${ago(u.created_at)}</span></div>`).join("")||'<p class="dim">Nobody has signed up yet.</p>';
- $("#t-overview").innerHTML=`<h2>Overview</h2><div class="grid g4"><div class="card stat"><b>${s.total}</b><span>Players</span></div><div class="card stat"><b>${s.new24h}</b><span>New in 24 hours</span></div><div class="card stat"><b>${s.active7d}</b><span>Active this week</span></div><div class="card stat"><b>${s.disabled}</b><span>Blocked</span></div></div>
- <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Newest players</h3>${recent}</div><div class="card"><h3>Devices</h3>${plat}</div></div>`}
+ $("#t-overview").innerHTML=`<h2>Overview</h2><div class="grid g4"><div class="card stat"><b>${s.total}</b><span>Players</span></div><div class="card stat"><b>${s.new24h}</b><span>New in 24 hours</span></div><div class="card stat"><b>${s.active7d}</b><span>Active this week</span></div><div class="card stat"><b>${s.open_reports}</b><span>Open problem reports</span></div></div>
+ <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Newest players</h3>${recent}</div><div class="card"><h3>Devices</h3>${plat}</div></div>
+ <div class="card" style="margin-top:14px"><h3>Levels finished (players)</h3>${Object.entries(LV).map(([id,n])=>{const v=(s.levels||{})[id]||0;return `<div style="margin:10px 0"><div class="row"><span>${esc(n)}</span><span class="sp"></span><span class="dim">${v}</span></div><div class="bar"><i style="width:${v/total*100}%"></i></div></div>`}).join("")}</div>`;badge(s.open_reports)}
+function badge(n){const b=$("#rbadge");b.textContent=n;b.classList.toggle("hide",!n)}
 
 let USERS=[];async function users(){$("#t-users").innerHTML=`<div class="row"><h2 style="margin:0">Players</h2><span class="sp"></span></div><input id="q" placeholder="Search name, username, email, phone or ID" style="margin:12px 0"><div id="ul"></div>`;
  $("#q").oninput=load;await load()}
-async function load(){USERS=await call("/v1/admin/users?q="+encodeURIComponent($("#q").value||""));$("#ul").innerHTML=USERS.map((u,i)=>`<div class="user" onclick="edit(${i})"><div class="av">${esc(u.name[0]||"?")}</div><div style="min-width:0"><b>${esc(u.name)}</b> <span class="dim">@${esc(u.username)}</span><div class="dim" style="font-size:13px">${esc(u.user_id)} · ${esc(u.email||u.phone||"")}</div></div><span class="sp"></span><div style="text-align:right"><span class="tag ${u.disabled?"off":"on"}">${u.disabled?"blocked":"active"}</span><div class="dim" style="font-size:12px;margin-top:4px">seen ${ago(u.last_seen)}</div></div></div>`).join("")||'<p class="dim">No players found yet. Players appear here after they create an account in the app.</p>'}
+async function load(){USERS=await call("/v1/admin/users?q="+encodeURIComponent($("#q").value||""));$("#ul").innerHTML=USERS.map((u,i)=>`<div class="user" onclick="edit(${i})"><div class="av">${esc(u.name[0]||"?")}</div><div style="min-width:0"><b>${esc(u.name)}</b> <span class="dim">@${esc(u.username)}</span><div class="dim" style="font-size:13px">${esc(u.user_id)} · ${esc(u.email||u.phone||"")}</div><div class="dim" style="font-size:13px">${prog(u).completed?prog(u).completed.length:0} levels · ${u.points||0} pts${u.last_level?" · last: "+esc(lvn(u.last_level)):""}</div></div><span class="sp"></span><div style="text-align:right"><span class="tag ${u.disabled?"off":"on"}">${u.disabled?"blocked":"active"}</span><div class="dim" style="font-size:12px;margin-top:4px">seen ${ago(u.last_seen)}</div></div></div>`).join("")||'<p class="dim">No players found yet. Players appear here after they create an account in the app.</p>'}
 
+const LV={bedroom:"1 Out of Bed",street:"2 Shul on Time",shul:"3 Davening",market:"4 Night Market",seder:"5 Seder Night",runner1:"Runner 1",runner2:"Runner 2"};
+const lvn=id=>LV[id]||id;
+function prog(u){let p={};try{p=JSON.parse(u.progress||"{}")}catch(e){}return p}
 const GAMES=[["fighter","Rise & Shine"],["runner","Street Runner"]],ITEMS=[["blaster","Blaster"],["rapid","Rapid Fire"]];
 function form(p){const ent=p.entitlements||[],inv=p.inventory||[];return `
  <label>Message shown on their home screen</label><textarea id="f-msg" rows="3" placeholder="e.g. Shabbat shalom, Moshe!">${esc(p.message||"")}</textarea>
@@ -97,11 +105,28 @@ function collect(base){let p={};try{p=JSON.parse($("#f-raw").value||"{}")}catch(
 async function edit(i){const u=USERS[i];const p=await call(`/v1/admin/users/${u.user_id}/profile`);$("#drawer").classList.remove("hide");
  $("#panel").innerHTML=`<div class="row"><div class="av">${esc(u.name[0])}</div><div><h3 style="margin:0">${esc(u.name)}</h3><div class="dim">@${esc(u.username)} · ${esc(u.user_id)}</div></div><span class="sp"></span><button class="ghost" onclick="closeD()">Close</button></div>
  <div class="dim" style="margin-top:10px;font-size:13px">${esc(u.email||"")} ${esc(u.phone||"")}<br>${esc(u.platform||"")} ${esc(u.model||"")} · joined ${ago(u.created_at)} · seen ${ago(u.last_seen)}</div>
+ <h3 style="margin-top:20px">Progress</h3><div class="row" style="gap:6px">${Object.keys(LV).map(id=>`<span class="tag ${(prog(u).completed||[]).includes(id)?"on":""}">${esc(lvn(id))}</span>`).join("")}</div><div class="dim" style="margin-top:8px;font-size:13px">${u.points||0} points · items: ${esc((prog(u).inventory||[]).join(", ")||"none")}<br>Last played: ${u.last_level?esc(lvn(u.last_level))+" ("+ago(u.last_played)+")":"nothing yet"}<br>App ${esc(u.app_version||"?")} · content v${u.content_version||"?"}<br>Terms accepted: ${u.terms_version?"v"+u.terms_version+" ("+ago(u.terms_at)+")":"no"}</div>
+ <div class="row" style="margin-top:10px"><button class="ghost" onclick="notifyOne('${u.user_id}','${esc(u.name.replace(/'/g,""))}')">Send notification</button></div>
  <h3 style="margin-top:20px">Private content</h3><p class="dim" style="margin:0">Only this person receives this. It reaches their app the next time it opens.</p>${form(p)}
  <div class="row" style="margin-top:20px"><button id="sv">Save for ${esc(u.name.split(" ")[0])}</button><button class="${u.disabled?"ghost":"danger"}" id="blk">${u.disabled?"Unblock":"Block player"}</button></div>`;
  $("#sv").onclick=async()=>{await call(`/v1/admin/users/${u.user_id}/profile`,{method:"PUT",body:JSON.stringify(collect())});toast("Saved");};
  $("#blk").onclick=async()=>{await call(`/v1/admin/users/${u.user_id}/status`,{method:"PUT",body:JSON.stringify({disabled:!u.disabled})});toast(u.disabled?"Unblocked":"Blocked");closeD();load()}}
 function closeD(){$("#drawer").classList.add("hide")}$("#drawer").onclick=e=>{if(e.target.id==="drawer")closeD()};
+
+
+async function reports(){const all=await call("/v1/admin/reports");badge(all.length);
+ $("#t-reports").innerHTML=`<h2>Problem reports</h2>`+(all.map(r=>`<div class="card" style="margin-bottom:12px"><div class="row"><span class="tag ${r.kind==="crash"?"off":""}">${r.kind==="crash"?"crashed":"reported"}</span><b>${esc(r.name||r.user_id)}</b><span class="dim">@${esc(r.username||"")}</span><span class="sp"></span><span class="dim">${ago(r.created_at)}</span></div>
+ <p style="margin:10px 0">${esc(r.message||"(no message)")}</p><div class="dim" style="font-size:13px">${r.level?"Level: "+esc(lvn(r.level))+" · ":""}${esc(r.device||"")} · app ${esc(r.app_version)} · content v${r.content_version}</div>
+ <details style="margin-top:8px"><summary class="dim" style="cursor:pointer">Logs</summary><pre style="white-space:pre-wrap;font-size:12px;max-height:300px;overflow:auto;background:#0b1230;padding:10px;border-radius:10px">${esc(r.logs)}</pre></details>
+ <div class="row" style="margin-top:10px"><button class="ghost" onclick="resolveR(${r.id})">Mark as fixed</button></div></div>`).join("")||'<p class="dim">No open problems. 🎉</p>')}
+async function resolveR(id){await call("/v1/admin/reports/"+id,{method:"PUT",body:JSON.stringify({resolved:true})});toast("Marked as fixed");reports()}
+async function notifyOne(uid,name){const t=prompt("Notification title for "+name);if(!t)return;const b=prompt("Message (optional)")||"";await call("/v1/admin/notifications",{method:"POST",body:JSON.stringify({user_id:uid,title:t,body:b})});toast("Sent")}
+async function notes(){const h=await call("/v1/admin/notifications");
+ $("#t-notes").innerHTML=`<h2>Notifications</h2><div class="card" style="max-width:640px"><p class="dim" style="margin-top:0">Shows up in every player's app within about 20 seconds if the app is open, or when they next open it.</p><label>Title</label><input id="nt"><label>Message</label><textarea id="nb" rows="3"></textarea><div class="row" style="margin-top:14px"><button id="ns">Send to everyone</button></div></div><h3 style="margin-top:22px">Recently sent</h3>`+h.map(n=>`<div class="user" style="cursor:default"><div><b>${esc(n.title)}</b><div class="dim" style="font-size:13px">${esc(n.body||"")}</div></div><span class="sp"></span><div class="dim" style="text-align:right;font-size:13px">${n.user_id?"to "+esc(n.name||n.user_id):"everyone"}<br>${ago(n.created_at)}</div></div>`).join("");
+ $("#ns").onclick=async()=>{if(!$("#nt").value.trim())return toast("Add a title");await call("/v1/admin/notifications",{method:"POST",body:JSON.stringify({title:$("#nt").value,body:$("#nb").value})});toast("Sent");notes()}}
+async function legal(){const l=await (await fetch(API+"/v1/legal")).json();
+ $("#t-legal").innerHTML=`<h2>Terms &amp; Privacy</h2><div class="card"><p class="dim" style="margin-top:0">Current version: <b>v${l.version}</b>. Publishing creates a new version: every player gets a notification and must accept it again before continuing. Have a lawyer review these texts before real use.</p><label>Terms of Use</label><textarea id="lt" rows="14">${esc(l.terms)}</textarea><label>Privacy Policy</label><textarea id="lp" rows="14">${esc(l.privacy)}</textarea><div class="row" style="margin-top:14px"><button id="ls">Publish new version</button></div></div>`;
+ $("#ls").onclick=async()=>{if(!confirm("Publish a new version? Every player must accept it again."))return;const r=await call("/v1/admin/legal",{method:"PUT",body:JSON.stringify({terms:$("#lt").value,privacy:$("#lp").value})});toast("Published v"+r.version);legal()}}
 
 async function broadcast(){const p=await call("/v1/admin/broadcast");$("#t-broadcast").innerHTML=`<h2>Send to everyone</h2><div class="card" style="max-width:640px"><p class="dim" style="margin-top:0">This goes to every player. A player's own private content takes priority over it.</p><div id="bf">${form(p)}</div><div class="row" style="margin-top:20px"><button id="bsv">Send to everyone</button></div></div>`;
  $("#bsv").onclick=async()=>{await call("/v1/admin/broadcast",{method:"PUT",body:JSON.stringify(collect())});toast("Sent to everyone")}}
