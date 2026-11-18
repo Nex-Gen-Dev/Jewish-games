@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Private Games Admin</title>
+<style>body{font:15px system-ui;background:#0b1024;color:#eee;margin:0;padding:14px}input,textarea,button{font:inherit;padding:10px;border-radius:8px;border:1px solid #345;background:#111a38;color:#fff;width:100%;box-sizing:border-box;margin:4px 0}button{background:#4ea1ff;color:#04101f;border:0;font-weight:600}.u{padding:10px;border:1px solid #234;border-radius:10px;margin:8px 0}small{color:#9ab}</style></head><body>
+<h2>Private Games Admin</h2>
+<input id="api" placeholder="API address (https://…workers.dev)"><input id="tok" type="password" placeholder="Admin token">
+<button onclick="load()">Load users</button><input id="q" placeholder="Search name / username / email / phone / ID" oninput="load()">
+<div id="list"></div>
+<div id="ed" style="display:none"><h3 id="who"></h3><small>JSON patch sent only to this person (theme, entitlements, message, inventory…)</small>
+<textarea id="patch" rows="12"></textarea><button onclick="save()">Save for this person</button></div>
+<h3>Send to everyone</h3><textarea id="bc" rows="5">{"message":"Hello everyone!"}</textarea><button onclick="bcast()">Send to everyone</button>
+<script>
+let cur=null;const H=()=>({authorization:"Bearer "+tok.value,"content-type":"application/json"});const A=p=>api.value.replace(/\/$/,"")+p;
+async function load(){const r=await fetch(A("/v1/admin/users?q="+encodeURIComponent(q.value)),{headers:H()});const d=await r.json();list.innerHTML="";(d.error?[]:d).forEach(u=>{const e=document.createElement("div");e.className="u";e.innerHTML=`<b>${u.name}</b> @${u.username}<br><small>${u.user_id} · ${u.email||""} ${u.phone||""}</small>`;e.onclick=()=>edit(u);list.appendChild(e)})}
+async function edit(u){cur=u.user_id;who.textContent=u.name+" ("+u.user_id+")";ed.style.display="block";const r=await fetch(A(`/v1/admin/users/${cur}/profile`),{headers:H()});patch.value=JSON.stringify(await r.json(),null,2)}
+async function save(){const r=await fetch(A(`/v1/admin/users/${cur}/profile`),{method:"PUT",headers:H(),body:patch.value});alert(r.ok?"Saved":"Error")}
+async function bcast(){const r=await fetch(A("/v1/admin/broadcast"),{method:"PUT",headers:H(),body:bc.value});alert(r.ok?"Sent":"Error")}
+</script></body></html>

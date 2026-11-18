@@ -1,0 +1,9 @@
+name = "private-games-api"
+main = "worker/src/index.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "private-games"
+database_id = "REPLACE_WITH_D1_ID"
+# secret (not stored here):  wrangler secret put ADMIN_TOKEN
