@@ -12,6 +12,11 @@ export default {
     const url = new URL(req.url); const p = url.pathname;
     if (req.method === "OPTIONS") return json({});
     try {
+      if (p === "/" || p === "/health") {
+        let db = "missing binding (DB)";
+        if (env.DB) { try { await env.DB.prepare("SELECT 1").first(); db = "ok"; } catch (e) { db = "error: " + e; } }
+        return json({ ok: true, service: "private-games-api", database: db, admin_token_set: !!env.ADMIN_TOKEN });
+      }
       // ---- app: register (idempotent per user_id)
       if (p === "/v1/register" && req.method === "POST") {
         const b = await req.json();
