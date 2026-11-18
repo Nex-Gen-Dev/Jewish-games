@@ -58,6 +58,23 @@ export default {
             return json({ ok: true });
           }
         }
+        if (p === "/v1/admin/stats" && req.method === "GET") {
+          const now = Date.now();
+          const t = await env.DB.prepare("SELECT COUNT(*) total, SUM(created_at>?1) new24h, SUM(last_seen>?2) active7d, SUM(disabled) disabled FROM users").bind(now - 864e5, now - 6048e5).first();
+          const pl = await env.DB.prepare("SELECT COALESCE(platform,'unknown') k, COUNT(*) v FROM users GROUP BY 1").all();
+          const rc = await env.DB.prepare("SELECT name,username,created_at FROM users ORDER BY created_at DESC LIMIT 6").all();
+          return json({ total: t.total || 0, new24h: t.new24h || 0, active7d: t.active7d || 0, disabled: t.disabled || 0,
+            platforms: Object.fromEntries(pl.results.map(r => [r.k, r.v])), recent: rc.results });
+        }
+        if ((m = p.match(/^\/v1\/admin\/users\/(PG-[A-Z0-9]{8})\/status$/)) && req.method === "PUT") {
+          const b = await req.json();
+          await env.DB.prepare("UPDATE users SET disabled=? WHERE user_id=?").bind(b.disabled ? 1 : 0, m[1]).run();
+          return json({ ok: true });
+        }
+        if (p === "/v1/admin/broadcast" && req.method === "GET") {
+          const r = await env.DB.prepare("SELECT patch FROM broadcast WHERE id=1").first();
+          return json(JSON.parse(r?.patch || "{}"));
+        }
         if (p === "/v1/admin/broadcast" && req.method === "PUT") {
           await env.DB.prepare("UPDATE broadcast SET patch=? WHERE id=1").bind(JSON.stringify(await req.json())).run();
           return json({ ok: true });

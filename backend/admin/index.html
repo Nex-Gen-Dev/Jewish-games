@@ -1,17 +1,113 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Private Games Admin</title>
-<style>body{font:15px system-ui;background:#0b1024;color:#eee;margin:0;padding:14px}input,textarea,button{font:inherit;padding:10px;border-radius:8px;border:1px solid #345;background:#111a38;color:#fff;width:100%;box-sizing:border-box;margin:4px 0}button{background:#4ea1ff;color:#04101f;border:0;font-weight:600}.u{padding:10px;border:1px solid #234;border-radius:10px;margin:8px 0}small{color:#9ab}</style></head><body>
-<h2>Private Games Admin</h2>
-<input id="api" placeholder="API address (https://…workers.dev)"><input id="tok" type="password" placeholder="Admin token">
-<button onclick="load()">Load users</button><input id="q" placeholder="Search name / username / email / phone / ID" oninput="load()">
-<div id="list"></div>
-<div id="ed" style="display:none"><h3 id="who"></h3><small>JSON patch sent only to this person (theme, entitlements, message, inventory…)</small>
-<textarea id="patch" rows="12"></textarea><button onclick="save()">Save for this person</button></div>
-<h3>Send to everyone</h3><textarea id="bc" rows="5">{"message":"Hello everyone!"}</textarea><button onclick="bcast()">Send to everyone</button>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Private Games · Admin</title>
+<style>
+:root{--bg:#080d1f;--card:#111936;--line:#233057;--txt:#eef2ff;--dim:#93a0c8;--acc:#4ea1ff;--good:#4ade80;--bad:#ff6b6b;--gold:#ffd34a}
+*{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(1100px 600px at 10% -10%,#1b2c63 0,transparent 60%),var(--bg);color:var(--txt);min-height:100vh}
+button,input,textarea,select{font:inherit;color:var(--txt)}
+input,textarea{width:100%;background:#0b1230;border:1px solid var(--line);border-radius:12px;padding:12px 14px;outline:none}input:focus,textarea:focus{border-color:var(--acc)}
+button{border:0;border-radius:12px;padding:11px 16px;font-weight:600;cursor:pointer;background:var(--acc);color:#04101f}button.ghost{background:#16204a;color:var(--txt);border:1px solid var(--line)}button.danger{background:#3a1620;color:var(--bad);border:1px solid #5a2230}button:active{transform:scale(.98)}
+.hide{display:none!important}
+/* login */
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.box{width:100%;max-width:400px;background:linear-gradient(180deg,#121b40,#0d1431);border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:0 20px 60px #0008}
+.logo{width:54px;height:54px;border-radius:16px;background:#16204a;display:grid;place-items:center;font-size:28px;color:var(--gold);margin:0 auto 14px}
+h1{font-size:22px;margin:0 0 4px;text-align:center}.sub{color:var(--dim);text-align:center;margin:0 0 20px}
+.err{color:var(--bad);min-height:20px;margin:8px 0;font-size:14px}
+/* app */
+header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line);background:#0a1230cc;backdrop-filter:blur(8px);position:sticky;top:0;z-index:5}
+header .brand{font-weight:700;font-size:17px;display:flex;gap:10px;align-items:center}header .brand i{color:var(--gold);font-style:normal}
+nav{display:flex;gap:6px;margin-left:10px;flex:1;overflow:auto}nav button{background:transparent;color:var(--dim);padding:9px 14px}nav button.on{background:#17225080;color:var(--txt);box-shadow:inset 0 0 0 1px var(--line)}
+main{max-width:1100px;margin:0 auto;padding:20px}
+.grid{display:grid;gap:14px}.g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.card{background:linear-gradient(180deg,#121a3c,#0e1533);border:1px solid var(--line);border-radius:16px;padding:18px}
+.stat b{display:block;font-size:34px;letter-spacing:-1px}.stat span{color:var(--dim)}
+h2{font-size:18px;margin:6px 0 14px}h3{margin:0 0 10px;font-size:16px}.dim{color:var(--dim)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sp{flex:1}
+.user{display:flex;gap:14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:14px;background:#0e1533;cursor:pointer;margin-bottom:10px}.user:hover{border-color:var(--acc)}
+.av{width:44px;height:44px;border-radius:50%;background:#1b2a63;color:var(--acc);display:grid;place-items:center;font-weight:700;font-size:18px;flex:none}
+.tag{font-size:12px;padding:3px 9px;border-radius:99px;background:#16204a;color:var(--dim);border:1px solid var(--line)}.tag.on{color:var(--good);border-color:#1e5a3a}.tag.off{color:var(--bad);border-color:#5a2230}
+.bar{height:10px;border-radius:6px;background:#16204a;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+/* drawer */
+#drawer{position:fixed;inset:0;background:#000a;z-index:20;display:flex;justify-content:flex-end}
+#panel{width:min(520px,100%);height:100%;overflow:auto;background:#0b1230;border-left:1px solid var(--line);padding:22px;animation:in .2s}
+@keyframes in{from{transform:translateX(40px);opacity:0}}
+label{display:block;color:var(--dim);font-size:13px;margin:14px 0 6px}
+.chk{display:flex;gap:10px;flex-wrap:wrap}.chk label{display:flex;gap:8px;align-items:center;margin:0;padding:9px 13px;border:1px solid var(--line);border-radius:12px;color:var(--txt);cursor:pointer;background:#0e1533}.chk input{width:auto}
+input[type=color]{height:44px;padding:4px;width:90px}
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#16204a;border:1px solid var(--line);padding:12px 18px;border-radius:12px;z-index:50;opacity:0;pointer-events:none;transition:.25s}#toast.show{opacity:1}
+</style></head><body>
+
+<div id="login"><div class="box">
+ <div class="logo">✡</div><h1>Private Games</h1><p class="sub">Admin dashboard</p>
+ <input id="pw" type="password" placeholder="Admin password" autocomplete="current-password">
+ <div class="err" id="lerr"></div>
+ <button style="width:100%" id="go">Continue</button>
+</div></div>
+
+<div id="app" class="hide">
+ <header><div class="brand"><i>✡</i> Private Games</div>
+  <nav id="nav"><button data-t="overview" class="on">Overview</button><button data-t="users">Players</button><button data-t="broadcast">Send to everyone</button><button data-t="updates">App updates</button></nav>
+  <button class="ghost" id="out">Sign out</button></header>
+ <main>
+  <section id="t-overview"></section>
+  <section id="t-users" class="hide"></section>
+  <section id="t-broadcast" class="hide"></section>
+  <section id="t-updates" class="hide"></section>
+ </main>
+</div>
+<div id="drawer" class="hide"><div id="panel"></div></div>
+<div id="toast"></div>
+
 <script>
-let cur=null;const H=()=>({authorization:"Bearer "+tok.value,"content-type":"application/json"});const A=p=>api.value.replace(/\/$/,"")+p;
-async function load(){const r=await fetch(A("/v1/admin/users?q="+encodeURIComponent(q.value)),{headers:H()});const d=await r.json();list.innerHTML="";(d.error?[]:d).forEach(u=>{const e=document.createElement("div");e.className="u";e.innerHTML=`<b>${u.name}</b> @${u.username}<br><small>${u.user_id} · ${u.email||""} ${u.phone||""}</small>`;e.onclick=()=>edit(u);list.appendChild(e)})}
-async function edit(u){cur=u.user_id;who.textContent=u.name+" ("+u.user_id+")";ed.style.display="block";const r=await fetch(A(`/v1/admin/users/${cur}/profile`),{headers:H()});patch.value=JSON.stringify(await r.json(),null,2)}
-async function save(){const r=await fetch(A(`/v1/admin/users/${cur}/profile`),{method:"PUT",headers:H(),body:patch.value});alert(r.ok?"Saved":"Error")}
-async function bcast(){const r=await fetch(A("/v1/admin/broadcast"),{method:"PUT",headers:H(),body:bc.value});alert(r.ok?"Sent":"Error")}
+const $=s=>document.querySelector(s);let TOKEN=sessionStorage.getItem("pgt")||"";const API=location.origin;
+const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)};
+const call=async(p,o={})=>{const r=await fetch(API+p,{...o,headers:{authorization:"Bearer "+TOKEN,"content-type":"application/json"}});if(r.status===401)throw new Error("auth");const d=await r.json();if(!r.ok)throw new Error(d.error||"error");return d};
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ago=t=>{if(!t)return"never";const s=(Date.now()-t)/1000;if(s<90)return"just now";if(s<3600)return Math.round(s/60)+" min ago";if(s<86400)return Math.round(s/3600)+" h ago";return Math.round(s/86400)+" d ago"};
+
+async function enter(){try{await call("/v1/admin/stats");sessionStorage.setItem("pgt",TOKEN);$("#login").classList.add("hide");$("#app").classList.remove("hide");show("overview")}catch(e){$("#lerr").textContent=e.message==="auth"?"Wrong password.":"Can't reach the server.";TOKEN=""}}
+$("#go").onclick=()=>{TOKEN=$("#pw").value;enter()};$("#pw").onkeydown=e=>{if(e.key==="Enter")$("#go").click()};
+$("#out").onclick=()=>{sessionStorage.removeItem("pgt");location.reload()};
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>show(b.dataset.t));
+function show(t){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));["overview","users","broadcast","updates"].forEach(x=>$("#t-"+x).classList.toggle("hide",x!==t));({overview,users,broadcast,updates})[t]()}
+
+async function overview(){const s=await call("/v1/admin/stats");const total=s.total||1;
+ const plat=Object.entries(s.platforms||{}).map(([k,v])=>`<div style="margin:10px 0"><div class="row"><span>${esc(k)}</span><span class="sp"></span><span class="dim">${v}</span></div><div class="bar"><i style="width:${v/total*100}%"></i></div></div>`).join("")||'<p class="dim">No players yet.</p>';
+ const recent=(s.recent||[]).map(u=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><div class="av" style="width:34px;height:34px;font-size:14px">${esc(u.name[0]||"?")}</div><div><b>${esc(u.name)}</b> <span class="dim">@${esc(u.username)}</span></div><span class="sp"></span><span class="dim">${ago(u.created_at)}</span></div>`).join("")||'<p class="dim">Nobody has signed up yet.</p>';
+ $("#t-overview").innerHTML=`<h2>Overview</h2><div class="grid g4"><div class="card stat"><b>${s.total}</b><span>Players</span></div><div class="card stat"><b>${s.new24h}</b><span>New in 24 hours</span></div><div class="card stat"><b>${s.active7d}</b><span>Active this week</span></div><div class="card stat"><b>${s.disabled}</b><span>Blocked</span></div></div>
+ <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Newest players</h3>${recent}</div><div class="card"><h3>Devices</h3>${plat}</div></div>`}
+
+let USERS=[];async function users(){$("#t-users").innerHTML=`<div class="row"><h2 style="margin:0">Players</h2><span class="sp"></span></div><input id="q" placeholder="Search name, username, email, phone or ID" style="margin:12px 0"><div id="ul"></div>`;
+ $("#q").oninput=load;await load()}
+async function load(){USERS=await call("/v1/admin/users?q="+encodeURIComponent($("#q").value||""));$("#ul").innerHTML=USERS.map((u,i)=>`<div class="user" onclick="edit(${i})"><div class="av">${esc(u.name[0]||"?")}</div><div style="min-width:0"><b>${esc(u.name)}</b> <span class="dim">@${esc(u.username)}</span><div class="dim" style="font-size:13px">${esc(u.user_id)} · ${esc(u.email||u.phone||"")}</div></div><span class="sp"></span><div style="text-align:right"><span class="tag ${u.disabled?"off":"on"}">${u.disabled?"blocked":"active"}</span><div class="dim" style="font-size:12px;margin-top:4px">seen ${ago(u.last_seen)}</div></div></div>`).join("")||'<p class="dim">No players found yet. Players appear here after they create an account in the app.</p>'}
+
+const GAMES=[["fighter","Rise & Shine"],["runner","Street Runner"]],ITEMS=[["blaster","Blaster"],["rapid","Rapid Fire"]];
+function form(p){const ent=p.entitlements||[],inv=p.inventory||[];return `
+ <label>Message shown on their home screen</label><textarea id="f-msg" rows="3" placeholder="e.g. Shabbat shalom, Moshe!">${esc(p.message||"")}</textarea>
+ <label>Games unlocked for them</label><div class="chk">${GAMES.map(([id,n])=>`<label><input type="checkbox" name="ent" value="${id}" ${ent.includes(id)?"checked":""}>${n}</label>`).join("")}</div>
+ <label>Items given for free</label><div class="chk">${ITEMS.map(([id,n])=>`<label><input type="checkbox" name="inv" value="${id}" ${inv.includes(id)?"checked":""}>${n}</label>`).join("")}</div>
+ <label>Theme colour</label><div class="row"><input type="color" id="f-acc" value="${esc((p.theme||{}).accent||"#4ea1ff")}"><label style="margin:0;display:flex;gap:8px;align-items:center"><input type="checkbox" id="f-useacc" ${(p.theme||{}).accent?"checked":""} style="width:auto"> use this colour</label></div>
+ <details style="margin-top:16px"><summary class="dim" style="cursor:pointer">Advanced (raw JSON)</summary><textarea id="f-raw" rows="8" style="font-family:monospace;font-size:13px;margin-top:8px">${esc(JSON.stringify(p,null,2))}</textarea></details>`}
+function collect(base){let p={};try{p=JSON.parse($("#f-raw").value||"{}")}catch(e){}
+ const m=$("#f-msg").value.trim();m?p.message=m:delete p.message;
+ const ent=[...document.querySelectorAll("input[name=ent]:checked")].map(x=>x.value),inv=[...document.querySelectorAll("input[name=inv]:checked")].map(x=>x.value);
+ ent.length?p.entitlements=ent:delete p.entitlements;inv.length?p.inventory=inv:delete p.inventory;
+ if($("#f-useacc").checked){p.theme={...(p.theme||{}),accent:$("#f-acc").value}}else if(p.theme){delete p.theme.accent;if(!Object.keys(p.theme).length)delete p.theme}
+ return p}
+async function edit(i){const u=USERS[i];const p=await call(`/v1/admin/users/${u.user_id}/profile`);$("#drawer").classList.remove("hide");
+ $("#panel").innerHTML=`<div class="row"><div class="av">${esc(u.name[0])}</div><div><h3 style="margin:0">${esc(u.name)}</h3><div class="dim">@${esc(u.username)} · ${esc(u.user_id)}</div></div><span class="sp"></span><button class="ghost" onclick="closeD()">Close</button></div>
+ <div class="dim" style="margin-top:10px;font-size:13px">${esc(u.email||"")} ${esc(u.phone||"")}<br>${esc(u.platform||"")} ${esc(u.model||"")} · joined ${ago(u.created_at)} · seen ${ago(u.last_seen)}</div>
+ <h3 style="margin-top:20px">Private content</h3><p class="dim" style="margin:0">Only this person receives this. It reaches their app the next time it opens.</p>${form(p)}
+ <div class="row" style="margin-top:20px"><button id="sv">Save for ${esc(u.name.split(" ")[0])}</button><button class="${u.disabled?"ghost":"danger"}" id="blk">${u.disabled?"Unblock":"Block player"}</button></div>`;
+ $("#sv").onclick=async()=>{await call(`/v1/admin/users/${u.user_id}/profile`,{method:"PUT",body:JSON.stringify(collect())});toast("Saved");};
+ $("#blk").onclick=async()=>{await call(`/v1/admin/users/${u.user_id}/status`,{method:"PUT",body:JSON.stringify({disabled:!u.disabled})});toast(u.disabled?"Unblocked":"Blocked");closeD();load()}}
+function closeD(){$("#drawer").classList.add("hide")}$("#drawer").onclick=e=>{if(e.target.id==="drawer")closeD()};
+
+async function broadcast(){const p=await call("/v1/admin/broadcast");$("#t-broadcast").innerHTML=`<h2>Send to everyone</h2><div class="card" style="max-width:640px"><p class="dim" style="margin-top:0">This goes to every player. A player's own private content takes priority over it.</p><div id="bf">${form(p)}</div><div class="row" style="margin-top:20px"><button id="bsv">Send to everyone</button></div></div>`;
+ $("#bsv").onclick=async()=>{await call("/v1/admin/broadcast",{method:"PUT",body:JSON.stringify(collect())});toast("Sent to everyone")}}
+
+async function updates(){let v={};try{v=await (await fetch("https://nex-gen-dev.github.io/Jewish-games/version.json?t="+Date.now())).json()}catch(e){}
+ $("#t-updates").innerHTML=`<h2>App updates</h2><div class="grid g2"><div class="card"><h3>Published version</h3>${v.content?`<div class="stat"><b>v${v.content}</b></div><p class="dim">${esc(v.notes||"")}<br>Needs app build ${v.min_binary}</p>`:'<p class="dim">Could not read the update feed. Is GitHub Pages turned on?</p>'}</div><div class="card"><h3>How updates reach players</h3><p class="dim">Game and level updates are published to GitHub by Claude. Every app checks for them each time it opens and installs them automatically. Private content (themes, games, messages) is set here and arrives the same way.</p></div></div>`}
+
+if(TOKEN)enter();
 </script></body></html>
