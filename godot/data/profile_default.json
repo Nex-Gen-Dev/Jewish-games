@@ -1,0 +1,32 @@
+{
+  "user_id": "guest",
+  "display_name": "Guest",
+  "message": "Welcome! Private updates for you will show up here.",
+  "theme": {
+    "bg_top": "#16264a",
+    "bg_bottom": "#0a0f1f",
+    "accent": "#4ea1ff"
+  },
+  "character": {
+    "skin": "#e8b894",
+    "shirt": "#f2f2f2",
+    "pants": "#1b1d2a",
+    "kippah": true,
+    "kippah_color": "#1c1c28",
+    "hair": "#3a2a1c"
+  },
+  "entitlements": [
+    "fighter"
+  ],
+  "dev_unlock_all": true,
+  "progress": {
+    "completed": [],
+    "points": 0
+  },
+  "inventory": [],
+  "settings": {
+    "controls": 0,
+    "quality": "auto"
+  },
+  "account": {}
+}

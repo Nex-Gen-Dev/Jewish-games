@@ -1,0 +1,147 @@
+{
+  "games": [
+    {
+      "id": "fighter",
+      "title": "Rise & Shine",
+      "subtitle": "3D action fighter",
+      "desc": "Fight your way through a very frum morning.",
+      "levels": [
+        {
+          "id": "bedroom",
+          "title": "1 · Out of Bed",
+          "desc": "Beat the Yetzer Hara before he wins the snooze battle."
+        },
+        {
+          "id": "street",
+          "title": "2 · Shul on Time",
+          "desc": "Run the street, smash the alarm clock, reach shul before davening starts."
+        },
+        {
+          "id": "shul",
+          "title": "3 · Davening in Shul",
+          "desc": "Put on tefillin, find your seat, stay quiet. No fighting here."
+        },
+        {
+          "id": "market",
+          "title": "4 · Night Market",
+          "desc": "Knife and rifle imps. Buy a blaster!"
+        },
+        {
+          "id": "seder",
+          "title": "5 · Seder Night",
+          "desc": "Boss fight at the Seder table. Find the Matzahs for a mega bomb."
+        },
+        {
+          "id": "purim",
+          "title": "6 · Purim Street",
+          "desc": "A long, crowded street. Reach the Purim Seudah in time."
+        },
+        {
+          "id": "finale",
+          "title": "7 · Final Round",
+          "desc": "The toughest Yetzer Hara. Collect Torah lights for the mega bomb."
+        }
+      ],
+      "howto": [
+        {
+          "title": "Your goal",
+          "body": "Rise & Shine is a 3D action game about a very frum morning. Beat the Yetzer Hara to get out of bed, run to shul on time, daven in peace, survive the night market and finish at the Seder. Finish each level to unlock the next one."
+        },
+        {
+          "title": "Controls",
+          "body": "{controls}"
+        },
+        {
+          "title": "Fighting",
+          "body": "Punch is fast. Kick hits harder and farther. Jump over low attacks. Dodge makes you safe for a moment while you stay in place, so you can steer yourself with the controls while dodging. Enemies flash red or aim a red line right before they attack or shoot: that is your signal to dodge or move."
+        },
+        {
+          "title": "Points, combos and the shop",
+          "body": "Every enemy you defeat gives points. Defeat several in a row within a few seconds to build a combo up to x5. Bosses are worth a lot. Spend points in the Shop on a blaster (SHOOT button, aims for you) and the rapid-fire upgrade."
+        },
+        {
+          "title": "In the shul",
+          "body": "The shul level is not a fight. Walk around and look at the shul, pick up your tefillin (hold the action button), then sit in your seat. While davening: do not answer the phone, do not talk back to the person who talks to you and do not signal. Three mistakes and you lose."
+        },
+        {
+          "title": "Mega bomb and camera",
+          "body": "In the Seder and Final Round levels, find 3 glowing items in the room. Collect all three to get a POWER UP (more health, faster, stronger) and a BOMB button. The bomb wipes out all the small Yetzer Haras and hurts the boss. In Settings > Game you can switch the camera to My eyes (first-person)."
+        },
+        {
+          "title": "The Yetzer Tov",
+          "body": "A glowing figure called the Yetzer Tov appears in the levels. Run to him and hold the action button to pray with him and heal, as long as nobody is hitting you. Use him when your health is low."
+        }
+      ]
+    },
+    {
+      "id": "runner",
+      "title": "Street Runner",
+      "subtitle": "3D lane runner",
+      "desc": "Sprint through the streets: dodge, jump, slide and grab coins.",
+      "levels": [
+        {
+          "id": "runner1",
+          "title": "1 · Erev Shabbos Dash",
+          "desc": "Race to shul before candle lighting. 900 m."
+        },
+        {
+          "id": "runner2",
+          "title": "2 · Night Chase",
+          "desc": "Cars and buses. The Yetzer Hara is behind you. 1300 m."
+        }
+      ],
+      "free": true,
+      "howto": [
+        {
+          "title": "Your goal",
+          "body": "Street Runner is a lane runner. You run forward by yourself. Stay alive until the finish line at the shul. You have 3 lives. Crashing into something costs a life."
+        },
+        {
+          "title": "Controls",
+          "body": "{runner_controls}"
+        },
+        {
+          "title": "Obstacles",
+          "body": "Crates, cars and buses block a lane: change lanes, or jump to land on top of crates and cars (not buses). You keep getting faster the longer you run. Get hit and the Yetzer Hara appears behind you: get hit again soon and he catches you. Red-and-white barriers are low: jump over them. Orange signs hang high: slide under them. In Night Chase, cars drive toward you, so move early."
+        },
+        {
+          "title": "Coins and points",
+          "body": "Collect gold coins for points. You also earn points for distance and a bonus when you reach the finish. Points work in the Shop like in every other game."
+        }
+      ]
+    }
+  ],
+  "shop": [
+    {
+      "id": "blaster",
+      "name": "Blaster",
+      "desc": "Shoot from a distance. Unlocks the SHOOT button.",
+      "cost": 150
+    },
+    {
+      "id": "rapid",
+      "name": "Rapid Fire upgrade",
+      "desc": "Blaster fires twice as fast.",
+      "cost": 400,
+      "requires": "blaster"
+    }
+  ],
+  "tour": [
+    {
+      "title": "Welcome to Private Games",
+      "body": "This is your own game app. Games, themes and messages made just for you show up here by themselves."
+    },
+    {
+      "title": "Play",
+      "body": "Pick a game and tap Play. Levels unlock one by one. Each game has a short How to play guide, and you can open it again any time from Settings."
+    },
+    {
+      "title": "Points and the Shop",
+      "body": "Finish levels and defeat enemies to earn points. Spend them in the Shop, for example on the blaster that helps you shoot from far away."
+    },
+    {
+      "title": "Alerts and help",
+      "body": "The bell at the top shows messages from us. If something goes wrong, open Settings and tap Report a problem. It sends us exactly what happened so we can fix it."
+    }
+  ]
+}
