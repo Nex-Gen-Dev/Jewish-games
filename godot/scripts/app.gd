@@ -8,6 +8,8 @@ const RunnerScript := preload("res://scripts/runner.gd")
 var current: Node
 var selftest_level := ""
 var cloud: Node
+var ui_shot_dir := "" ## test only: render launcher screens to PNG files
+var teaser_mode := false ## recording promo clips: hide every HUD element
 
 
 func _ready() -> void:
@@ -25,14 +27,31 @@ func _ready() -> void:
 	for a in args:
 		if a == "--nogun":
 			pass
+		if a.begins_with("--uishot="):
+			ui_shot_dir = a.get_slice("=", 1)
+		if a == "--teaser":
+			teaser_mode = true
 		if a.begins_with("--selftest="):
 			selftest_level = a.get_slice("=", 1)
-	if selftest_level != "":
+	if ui_shot_dir != "":
+		Updater.checked_this_session = true ## never contact the server in this test
+		var t: Node = load("res://tests/shot_ui.gd").new()
+		t.set("out", ui_shot_dir)
+		t.set("app", self)
+		add_child(t)
+	elif selftest_level != "":
 		if "--gun" in args:
 			Profile.data["inventory"] = ["blaster", "rapid"]
 		start_level(selftest_level)
 	else:
 		show_launcher()
+
+
+func _process(_d: float) -> void:
+	if teaser_mode and current:
+		for c in current.get_children():
+			if c is CanvasLayer or c is Control:
+				c.visible = false
 
 
 func _notification(what: int) -> void:

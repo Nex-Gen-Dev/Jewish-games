@@ -57,9 +57,25 @@ func _draw() -> void:
 			draw_circle(c + Vector2(0, -r * .3), r * .38, color)
 			draw_arc(c + Vector2(0, r * .85), r * .75, PI, TAU, 16, color, r * .3, true)
 		"bell":
-			draw_arc(c + Vector2(0, -r * .1), r * .55, PI, TAU, 18, color, maxf(r * .22, 2.0), true)
-			draw_colored_polygon(PackedVector2Array([c + Vector2(-r * .55, -r * .1), c + Vector2(r * .55, -r * .1), c + Vector2(r * .8, r * .5), c + Vector2(-r * .8, r * .5)]), color)
-			draw_circle(c + Vector2(0, r * .72), r * .2, color)
+			var pts := PackedVector2Array()
+			for i in 13:
+				pts.append(c + Vector2(0, -r * .1) + Vector2.from_angle(PI + i * PI / 12.0) * r * .55)
+			pts.append(c + Vector2(r * .8, r * .55))
+			pts.append(c + Vector2(-r * .8, r * .55))
+			draw_colored_polygon(pts, color)
+			draw_circle(c + Vector2(0, r * .78), r * .2, color)
+			draw_circle(c + Vector2(0, -r * .72), r * .12, color)
+		"back":
+			draw_polyline(PackedVector2Array([c + Vector2(r * .3, -r * .65), c + Vector2(-r * .35, 0), c + Vector2(r * .3, r * .65)]), color, maxf(r * .22, 2.2), true)
+		"pad":
+			draw_rect(Rect2(c + Vector2(-r * .95, -r * .45), Vector2(r * 1.9, r * .95)), color, true)
+			draw_circle(c + Vector2(-r * .7, r * .3), r * .42, color)
+			draw_circle(c + Vector2(r * .7, r * .3), r * .42, color)
+			var hole := Color(0, 0, 0, 0.55)
+			draw_rect(Rect2(c + Vector2(-r * .62, -r * .2), Vector2(r * .34, r * .1)), hole, true)
+			draw_rect(Rect2(c + Vector2(-r * .5, -r * .32), Vector2(r * .1, r * .34)), hole, true)
+			draw_circle(c + Vector2(r * .45, -r * .12), r * .08, hole)
+			draw_circle(c + Vector2(r * .68, -r * .12), r * .08, hole)
 		"help":
 			draw_arc(c + Vector2(0, -r * .2), r * .45, PI * 1.05, TAU + PI * .35, 16, color, maxf(r * .2, 2.0), true)
 			draw_circle(c + Vector2(0, r * .8), r * .13, color)

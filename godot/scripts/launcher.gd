@@ -3,23 +3,40 @@ extends Control
 ## Home of the app. Responsive: bottom tab bar in portrait, side rail in
 ## landscape / tablets. Everything scrolls by dragging anywhere. First launch
 ## shows a sign-in (name, username, email or phone) that creates a user ID.
+## Tapping a game opens its own "game hub" page (levels, how to play, options).
 
 const APP_VERSION := "1.2"
 const MAX_W := 900.0
 const Icon := preload("res://scripts/ui_icon.gd")
-const HeroArt := preload("res://scripts/hero_art.gd")
 const AppLog := preload("res://scripts/applog.gd")
+const TeaserScript := preload("res://scripts/teaser.gd")
+const BgArt := preload("res://scripts/bg_art.gd")
+const F_DISPLAY: Font = preload("res://assets/fonts/BarlowCondensed-Bold.ttf")
+const F_BODY: Font = preload("res://assets/fonts/Barlow-Medium.ttf")
+const F_STRONG: Font = preload("res://assets/fonts/Barlow-SemiBold.ttf")
 
-const TEXT := Color(1, 1, 1, 0.92)
-const DIM := Color(1, 1, 1, 0.6)
-const FAINT := Color(1, 1, 1, 0.38)
-const GOLD := Color("#ffd34a")
-const GOOD := Color("#4ade80")
-const BAD := Color("#ff6b6b")
+## Palette: neutral near-black surfaces, warm white text, one amber accent.
+const BG_TOP := Color("#17181b")
+const BG_BOTTOM := Color("#08090a")
+const SURF := Color("#16181b")
+const SURF2 := Color("#1f2226")
+const LINE := Color("#2d3137")
+const TEXT := Color("#f4f1ea")
+const DIM := Color("#a9a59c")
+const FAINT := Color("#6f6c65")
+const DEF_ACCENT := Color("#f5b027")
+const GOLD := Color("#ffc83d")
+const GOOD := Color("#46c98b")
+const BAD := Color("#ef5a4c")
+const INK := Color("#15110a") ## dark text on accent buttons
+## Earlier versions saved these as the user's "theme": treat them as "not customised".
+const OLD_THEME := {"accent": "#4ea1ff", "bg_top": "#16264a", "bg_bottom": "#0a0f1f"}
+
+static var resume_hub := "" ## after a level ends, come back to this game's page
 
 var tab := "play"
 var wide := false
-var accent := Color("#4ea1ff")
+var accent := DEF_ACCENT
 var up: Updater
 var apk_url := ""
 var ui: Control ## everything except the background; rebuilt on rotation
@@ -31,14 +48,30 @@ var nav_items: Dictionary = {}
 var update_status: Label
 var cloud: Node
 var bell_badge: Label
+var f_spaced: FontVariation
 var _sig_last := ""
 var _toast_node: Control
-
+var _tap_stamp := -1
+var _modal_dismissable := true
+var bg_art: Control
+# game hub (the "app inside the app" page of one game)
+var hub: Control
+var hub_game: Dictionary = {}
+var hub_tab := "levels"
+var hub_body: VBoxContainer
+var hub_tabs: Dictionary = {}
+var hub_scroll: ScrollContainer
+var hub_points: Label
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	accent = Profile.get_color("theme", "accent", Color("#4ea1ff"))
+	theme = Theme.new()
+	theme.default_font = F_BODY
+	f_spaced = FontVariation.new()
+	f_spaced.base_font = F_DISPLAY
+	f_spaced.spacing_glyph = 2
+	accent = _theme_color("accent", DEF_ACCENT)
 	_build_background()
 	up = Updater.new()
 	add_child(up)
@@ -59,6 +92,18 @@ func _ready() -> void:
 	_rebuild()
 	_check_terms.call_deferred()
 	_maybe_tour.call_deferred()
+	_resume_hub.call_deferred()
+
+
+## A colour from the user's private theme, unless it is still an old default.
+func _theme_color(key: String, fallback: Color) -> Color:
+	var th: Variant = Profile.data.get("theme", {})
+	if not th is Dictionary:
+		return fallback
+	var raw := str(th.get(key, ""))
+	if raw == "" or raw.to_lower() == str(OLD_THEME.get(key, "")):
+		return fallback
+	return Color(raw)
 
 
 func _is_wide() -> bool:
@@ -81,10 +126,12 @@ func _sig() -> String:
 func _on_profile_changed() -> void:
 	if points_label and is_instance_valid(points_label):
 		points_label.text = str(Profile.points())
+	if hub_points and is_instance_valid(hub_points):
+		hub_points.text = str(Profile.points())
 	var sg := _sig()
 	if sg != _sig_last:
 		_sig_last = sg
-		accent = Profile.get_color("theme", "accent", Color("#4ea1ff"))
+		accent = _theme_color("accent", DEF_ACCENT)
 		if content and is_instance_valid(content) and Profile.has_account():
 			_show(tab)
 
@@ -94,6 +141,15 @@ func _on_update_status(text: String) -> void:
 		update_status.text = text
 	if tab == "play" and ui and (Updater.ready_to_restart or apk_url != ""):
 		_show("play")
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if get_node_or_null("Modal"):
+			if _modal_dismissable:
+				_close_modal()
+		elif hub and is_instance_valid(hub):
+			_close_hub()
 
 
 func _insets() -> Vector4:
@@ -113,49 +169,20 @@ func _insets() -> Vector4:
 # ---------------------------------------------------------------- background
 
 func _build_background() -> void:
-	var top := Profile.get_color("theme", "bg_top", Color("#16264a"))
-	var bottom := Profile.get_color("theme", "bg_bottom", Color("#0a0f1f"))
-	var grad := Gradient.new()
-	grad.set_color(0, top)
-	grad.set_color(1, bottom)
-	var gt := GradientTexture2D.new()
-	gt.gradient = grad
-	gt.fill_from = Vector2(0.5, 0)
-	gt.fill_to = Vector2(0.5, 1)
-	var bg := TextureRect.new()
-	bg.texture = gt
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.stretch_mode = TextureRect.STRETCH_SCALE
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
-	# two slow drifting colour glows
-	for i in 2:
-		var g := Gradient.new()
-		g.set_color(0, Color(accent.r, accent.g, accent.b, 0.30 if i == 0 else 0.18))
-		g.set_color(1, Color(accent.r, accent.g, accent.b, 0.0))
-		var t := GradientTexture2D.new()
-		t.gradient = g
-		t.fill = GradientTexture2D.FILL_RADIAL
-		t.fill_from = Vector2(0.5, 0.5)
-		t.fill_to = Vector2(1.0, 0.5)
-		t.width = 256
-		t.height = 256
-		var r := TextureRect.new()
-		r.texture = t
-		r.custom_minimum_size = Vector2(620, 620)
-		r.size = Vector2(620, 620)
-		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		r.position = Vector2(-200 + i * 500, -150 + i * 400)
-		add_child(r)
-		var tw := create_tween().set_loops()
-		tw.tween_property(r, "position", r.position + Vector2(160, 120) * (1 if i == 0 else -1), 9.0 + i * 3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		tw.tween_property(r, "position", r.position, 9.0 + i * 3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	bg_art = BgArt.new()
+	bg_art.top = _theme_color("bg_top", BG_TOP)
+	bg_art.bottom = _theme_color("bg_bottom", BG_BOTTOM)
+	bg_art.accent = accent
+	add_child(bg_art)
 
 
 # ---------------------------------------------------------------- frame
 
 func _rebuild() -> void:
+	var reopen: Dictionary = {}
+	if hub and is_instance_valid(hub):
+		reopen = hub_game
+		_close_hub(false)
 	if ui and is_instance_valid(ui):
 		ui.queue_free()
 	ui = Control.new()
@@ -168,6 +195,18 @@ func _rebuild() -> void:
 		return
 	_build_frame()
 	_show(tab)
+	if not reopen.is_empty():
+		_open_hub(reopen)
+
+
+func _resume_hub() -> void:
+	if resume_hub == "" or not Profile.has_account() or (hub and is_instance_valid(hub)):
+		return
+	for g in Profile.manifest.get("games", []):
+		if str(g["id"]) == resume_hub and _owned(g):
+			_open_hub(g)
+			return
+	resume_hub = ""
 
 
 func _build_frame() -> void:
@@ -185,44 +224,25 @@ func _build_frame() -> void:
 	main.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main.add_theme_constant_override("separation", 0)
 
-	# header: tab title on the left, points on the right
+	# header: title on the left, messages + points on the right
 	var header := MarginContainer.new()
 	header.add_theme_constant_override("margin_left", 18)
 	header.add_theme_constant_override("margin_right", 18)
-	header.add_theme_constant_override("margin_top", 10)
-	header.add_theme_constant_override("margin_bottom", 4)
+	header.add_theme_constant_override("margin_top", 12)
+	header.add_theme_constant_override("margin_bottom", 6)
 	main.add_child(header)
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 10)
 	header.add_child(hb)
 	if not wide:
-		hb.add_child(Icon.new().setup("star", GOLD, 24))
-	title_label = _label(hb, "Play", 22, TEXT, false)
+		var logo := Icon.new().setup("star", accent, 26)
+		logo.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		hb.add_child(logo)
+	title_label = _title(hb, "Games", 28, TEXT, true)
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var bell := PanelContainer.new()
-	bell.add_theme_stylebox_override("panel", _box(Color(0, 0, 0, 0.35), Color(1, 1, 1, 0.18), 18, 1, 7, 9))
-	hb.add_child(bell)
-	var bstack := Control.new()
-	bstack.custom_minimum_size = Vector2(22, 22)
-	bell.add_child(bstack)
-	bstack.add_child(Icon.new().setup("bell", TEXT, 22))
-	bell_badge = Label.new()
-	bell_badge.add_theme_font_size_override("font_size", 11)
-	bell_badge.add_theme_color_override("font_color", Color.WHITE)
-	bell_badge.position = Vector2(14, -8)
-	bell_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bstack.add_child(bell_badge)
-	_tap(bell, _open_inbox)
-	_refresh_bell()
-	var chip := PanelContainer.new()
-	chip.add_theme_stylebox_override("panel", _box(Color(0, 0, 0, 0.35), Color(GOLD, 0.5), 18, 1, 6, 12))
-	hb.add_child(chip)
-	var cb := HBoxContainer.new()
-	cb.add_theme_constant_override("separation", 6)
-	chip.add_child(cb)
-	cb.add_child(Icon.new().setup("coin", GOLD, 18))
-	points_label = _label(cb, str(Profile.points()), 16, GOLD, false)
+	hb.add_child(_bell_button())
+	hb.add_child(_coin_chip(false))
 
 	# scrolling content: drag anywhere
 	scroll = ScrollContainer.new()
@@ -260,13 +280,42 @@ func _build_frame() -> void:
 		col.add_theme_constant_override("separation", 0)
 		outer.add_child(col)
 		col.add_child(main)
-		var vs := Label.new()
-		vs.text = "  " + _ver()
-		vs.add_theme_font_size_override("font_size", 11)
-		vs.add_theme_color_override("font_color", FAINT)
-		vs.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		col.add_child(vs)
 		col.add_child(_bottom_nav())
+
+
+func _bell_button() -> Control:
+	var bell := PanelContainer.new()
+	bell.add_theme_stylebox_override("panel", _box(SURF2, LINE, 8, 1, 8, 10))
+	var bstack := Control.new()
+	bstack.custom_minimum_size = Vector2(22, 22)
+	bell.add_child(bstack)
+	bstack.add_child(Icon.new().setup("bell", TEXT, 22))
+	bell_badge = Label.new()
+	bell_badge.add_theme_font_size_override("font_size", 12)
+	bell_badge.add_theme_color_override("font_color", BAD)
+	bell_badge.position = Vector2(14, -9)
+	bell_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bstack.add_child(bell_badge)
+	_tap(bell, _open_inbox)
+	_refresh_bell()
+	bell.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return bell
+
+
+func _coin_chip(is_hub: bool) -> Control:
+	var chip := PanelContainer.new()
+	chip.add_theme_stylebox_override("panel", _box(SURF2, Color(GOLD, 0.55), 8, 1, 6, 12))
+	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var cb := HBoxContainer.new()
+	cb.add_theme_constant_override("separation", 6)
+	chip.add_child(cb)
+	cb.add_child(Icon.new().setup("coin", GOLD, 18))
+	var l := _title(cb, str(Profile.points()), 19, GOLD, true)
+	if is_hub:
+		hub_points = l
+	else:
+		points_label = l
+	return chip
 
 
 func _ver() -> String:
@@ -283,13 +332,16 @@ func _spacer() -> Control:
 	return s
 
 
-const TABS := [["play", "Play", "play"], ["shop", "Shop", "shop"], ["settings", "Settings", "gear"]]
+const TABS := [["play", "Games", "pad"], ["shop", "Shop", "shop"], ["settings", "Settings", "gear"]]
 
 
 func _bottom_nav() -> Control:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", _box(Color(0.03, 0.05, 0.12, 0.92), Color(1, 1, 1, 0.08), 0, 0, 6, 8))
+	var sb := _box(Color("#0e0f11"), LINE, 0, 0, 0, 6)
+	sb.border_width_top = 1
+	p.add_theme_stylebox_override("panel", sb)
 	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 0)
 	p.add_child(hb)
 	for t in TABS:
 		hb.add_child(_nav_item(t[0], t[1], t[2], false))
@@ -298,19 +350,21 @@ func _bottom_nav() -> Control:
 
 func _rail() -> Control:
 	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(176, 0)
-	p.add_theme_stylebox_override("panel", _box(Color(0.03, 0.05, 0.12, 0.8), Color(1, 1, 1, 0.08), 0, 0, 16, 12))
+	p.custom_minimum_size = Vector2(190, 0)
+	var sb := _box(Color("#0e0f11"), LINE, 0, 0, 18, 12)
+	sb.border_width_right = 1
+	p.add_theme_stylebox_override("panel", sb)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	p.add_child(v)
 	var brand := HBoxContainer.new()
 	brand.add_theme_constant_override("separation", 8)
 	v.add_child(brand)
-	brand.add_child(Icon.new().setup("star", GOLD, 26))
-	var bl := _label(brand, "Private\nGames", 17, TEXT, false)
+	brand.add_child(Icon.new().setup("star", accent, 30))
+	var bl := _title(brand, "PRIVATE\nGAMES", 19, TEXT, true)
 	bl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var gap := Control.new()
-	gap.custom_minimum_size = Vector2(0, 14)
+	gap.custom_minimum_size = Vector2(0, 18)
 	v.add_child(gap)
 	for t in TABS:
 		v.add_child(_nav_item(t[0], t[1], t[2], true))
@@ -324,22 +378,23 @@ func _rail() -> Control:
 func _nav_item(id: String, text: String, icon: String, horizontal: bool) -> Control:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.custom_minimum_size = Vector2(0, 48)
-	panel.add_theme_stylebox_override("panel", _box(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 12, 0, 6, 10))
+	panel.custom_minimum_size = Vector2(0, 52)
+	panel.add_theme_stylebox_override("panel", _box(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 8, 0, 6, 10))
 	var box: BoxContainer = HBoxContainer.new() if horizontal else VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10 if horizontal else 2)
+	box.add_theme_constant_override("separation", 10 if horizontal else 1)
 	if not horizontal:
 		box.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(box)
-	var ic := Icon.new().setup(icon, DIM, 22)
+	var ic := Icon.new().setup(icon, DIM, 24)
 	if not horizontal:
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(ic)
-	var l := _label(box, text, 14 if horizontal else 12, DIM, false)
+	var l := _title(box, text, 16, DIM, true)
+	l.text = text.to_upper()
 	if not horizontal:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tap(panel, func(): _show(id))
-	nav_items[id] = {"panel": panel, "icon": ic, "label": l}
+	nav_items[id] = {"panel": panel, "icon": ic, "label": l, "horizontal": horizontal}
 	return panel
 
 
@@ -352,8 +407,16 @@ func _show(which: String) -> void:
 		var it: Dictionary = nav_items[id]
 		it["icon"].set_color(accent if on else DIM)
 		it["label"].add_theme_color_override("font_color", accent if on else DIM)
-		(it["panel"] as PanelContainer).add_theme_stylebox_override("panel", _box(Color(accent, 0.16) if on else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 12, 0, 6, 10))
-	title_label.text = {"play": "Play", "shop": "Shop", "settings": "Settings"}.get(which, "")
+		var nb := _box(Color(accent, 0.12) if on else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 8, 0, 6, 10)
+		if on and not bool(it["horizontal"]):
+			nb.border_width_top = 3
+			nb.border_color = accent
+			nb.set_corner_radius_all(0)
+		elif on:
+			nb.border_width_left = 3
+			nb.border_color = accent
+		(it["panel"] as PanelContainer).add_theme_stylebox_override("panel", nb)
+	title_label.text = {"play": "PRIVATE GAMES", "shop": "SHOP", "settings": "SETTINGS"}.get(which, "")
 	for c in content.get_children():
 		content.remove_child(c)
 		c.queue_free()
@@ -375,23 +438,32 @@ func _animate_in(parent: Control) -> void:
 			continue
 		c.modulate.a = 0.0
 		var tw := c.create_tween()
-		tw.tween_property(c, "modulate:a", 1.0, 0.28).set_delay(i * 0.055)
+		tw.tween_property(c, "modulate:a", 1.0, 0.25).set_delay(i * 0.05)
 		i += 1
 
 
 # ---------------------------------------------------------------- building blocks
 
-func _box(fill: Color, border: Color, radius := 14, bw := 1, mv := 12, mh := 14) -> StyleBoxFlat:
+func _box(fill: Color, border: Color, radius := 10, bw := 1, mv := 12, mh := 14) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = fill
 	sb.border_color = border
 	sb.set_border_width_all(bw)
 	sb.set_corner_radius_all(radius)
-	sb.corner_detail = 10
+	sb.corner_detail = 8
 	sb.content_margin_top = mv
 	sb.content_margin_bottom = mv
 	sb.content_margin_left = mh
 	sb.content_margin_right = mh
+	return sb
+
+
+## Game-style panel: two opposite corners are cut bigger than the others.
+func _slant(sb: StyleBoxFlat, big := 16, small := 4) -> StyleBoxFlat:
+	sb.corner_radius_top_left = big
+	sb.corner_radius_bottom_right = big
+	sb.corner_radius_top_right = small
+	sb.corner_radius_bottom_left = small
 	return sb
 
 
@@ -401,6 +473,9 @@ func _label(parent: Control, text: String, size := 15, color := TEXT, wrap := tr
 	if wrap:
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if size >= 19:
+		l.add_theme_font_override("font", F_DISPLAY)
+		size = int(size * 1.12)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -408,13 +483,23 @@ func _label(parent: Control, text: String, size := 15, color := TEXT, wrap := tr
 	return l
 
 
-## A rounded card. Returns its inner VBox.
-func _card(parent: Control, border := Color(1, 1, 1, 0.1), fill := Color(1, 1, 1, 0.06), pad := 14) -> VBoxContainer:
+## Headline text in the condensed display font.
+func _title(parent: Control, text: String, size := 24, color := TEXT, upper := false) -> Label:
+	var l := Label.new()
+	l.text = text.to_upper() if upper else text
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.add_theme_font_override("font", F_DISPLAY)
+	l.add_theme_font_size_override("font_size", int(size * 1.1))
+	l.add_theme_color_override("font_color", color)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(l)
+	return l
+
+
+## A flat card. Returns its inner VBox.
+func _card(parent: Control, border := LINE, fill := SURF, pad := 14) -> VBoxContainer:
 	var p := PanelContainer.new()
-	var sb := _box(fill, border, 16, 1, pad, pad)
-	sb.shadow_color = Color(0, 0, 0, 0.3)
-	sb.shadow_size = 6
-	p.add_theme_stylebox_override("panel", sb)
+	p.add_theme_stylebox_override("panel", _box(fill, border, 10, 1, pad, pad))
 	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(p)
@@ -425,12 +510,31 @@ func _card(parent: Control, border := Color(1, 1, 1, 0.1), fill := Color(1, 1, 1
 	return v
 
 
+## Section heading: small accent bar + spaced condensed caps.
 func _section(parent: Control, text: String) -> Label:
-	var l := _label(parent, text.to_upper(), 12, FAINT)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 8)
+	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(hb)
+	var bar := ColorRect.new()
+	bar.color = accent
+	bar.custom_minimum_size = Vector2(4, 16)
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hb.add_child(bar)
+	var l := Label.new()
+	l.text = text.to_upper()
+	l.add_theme_font_override("font", f_spaced)
+	l.add_theme_font_size_override("font_size", 17)
+	l.add_theme_color_override("font_color", DIM)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hb.add_child(l)
 	return l
 
 
 ## Make any control tappable while still letting the page scroll when dragged.
+## When a tappable control sits inside another one, only the inner one fires.
 func _tap(c: Control, cb: Callable) -> void:
 	c.mouse_filter = Control.MOUSE_FILTER_PASS
 	c.set_meta("down", Vector2(-9999, -9999))
@@ -445,6 +549,10 @@ func _tap(c: Control, cb: Callable) -> void:
 				var d: Vector2 = c.get_meta("down")
 				c.set_meta("down", Vector2(-9999, -9999))
 				if d.x > -9000 and d.distance_to(gp) < 14.0:
+					var fr := Engine.get_process_frames()
+					if _tap_stamp == fr:
+						return
+					_tap_stamp = fr
 					cb.call()
 		elif e is InputEventMouseMotion:
 			var d2: Vector2 = c.get_meta("down")
@@ -465,20 +573,28 @@ func _fx(c: Control, down: bool) -> void:
 func _button(parent: Control, text: String, cb: Callable, primary := true, enabled := true, danger := false) -> Control:
 	var p := PanelContainer.new()
 	var col := BAD if danger else accent
-	var fill := col if primary else Color(1, 1, 1, 0.08)
-	var border := col.lightened(0.25) if primary else Color(1, 1, 1, 0.16)
+	var fill := col if primary else SURF2
+	var border := col.lightened(0.2) if primary else LINE
+	if danger and not primary:
+		border = Color(BAD, 0.6)
 	if not enabled:
-		fill = Color(1, 1, 1, 0.05)
-		border = Color(1, 1, 1, 0.08)
-	p.add_theme_stylebox_override("panel", _box(fill, border, 12, 1, 12, 16))
-	p.custom_minimum_size = Vector2(0, 46)
+		fill = SURF
+		border = Color(LINE, 0.6)
+	var sb := _box(fill, border, 6, 1, 11, 16)
+	if primary and enabled:
+		_slant(sb, 14, 4)
+	p.add_theme_stylebox_override("panel", sb)
+	p.custom_minimum_size = Vector2(0, 48)
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var l := Label.new()
-	l.text = text
+	l.text = text.to_upper()
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", 16)
-	var tc := Color(0.04, 0.08, 0.16) if (primary and enabled and not danger) else ((BAD if danger else Color.WHITE) if enabled else FAINT)
+	l.add_theme_font_override("font", F_DISPLAY)
+	l.add_theme_font_size_override("font_size", 20)
+	var tc := INK if (primary and enabled and not danger) else ((BAD if danger else TEXT) if enabled else FAINT)
+	if danger and primary and enabled:
+		tc = Color.WHITE
 	l.add_theme_color_override("font_color", tc)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(l)
@@ -493,12 +609,13 @@ func _button(parent: Control, text: String, cb: Callable, primary := true, enabl
 func _badge(parent: Control, text: String, col: Color, size := 36) -> Control:
 	var p := PanelContainer.new()
 	p.custom_minimum_size = Vector2(size, size)
-	p.add_theme_stylebox_override("panel", _box(Color(col, 0.2), Color(col, 0.7), size / 2, 1, 0, 0))
+	p.add_theme_stylebox_override("panel", _box(Color(col, 0.16), Color(col, 0.8), 8, 1, 0, 0))
 	var l := Label.new()
 	l.text = text
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", 16)
+	l.add_theme_font_override("font", F_DISPLAY)
+	l.add_theme_font_size_override("font_size", int(size * 0.55))
 	l.add_theme_color_override("font_color", col)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(l)
@@ -508,17 +625,54 @@ func _badge(parent: Control, text: String, col: Color, size := 36) -> Control:
 	return p
 
 
+func _bar(parent: Control, frac: float, col: Color, h := 6) -> ProgressBar:
+	var pb := ProgressBar.new()
+	pb.min_value = 0.0
+	pb.max_value = 1.0
+	pb.value = clampf(frac, 0.0, 1.0)
+	pb.show_percentage = false
+	pb.custom_minimum_size = Vector2(0, h)
+	pb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pb.add_theme_stylebox_override("background", _box(Color("#0b0c0e"), LINE, 3, 1, 0, 0))
+	pb.add_theme_stylebox_override("fill", _box(col, col, 3, 0, 0, 0))
+	parent.add_child(pb)
+	return pb
+
+
+## Black-to-clear fade laid over pictures so text on top stays readable.
+func _scrim(parent: Control, from_bottom := true, strength := 0.85) -> void:
+	var g := Gradient.new()
+	g.set_color(0, Color(0, 0, 0, strength if from_bottom else 0.0))
+	g.set_color(1, Color(0, 0, 0, 0.0 if from_bottom else strength))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill_from = Vector2(0, 1) if from_bottom else Vector2(0, 0)
+	gt.fill_to = Vector2(0, 0) if from_bottom else Vector2(0, 1)
+	gt.width = 8
+	gt.height = 128
+	var tr := TextureRect.new()
+	tr.texture = gt
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_SCALE
+	tr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(tr)
+
+
 func _field(parent: Control, caption: String, placeholder: String, kbd := LineEdit.KEYBOARD_TYPE_DEFAULT) -> LineEdit:
 	_label(parent, caption, 13, DIM)
 	var e := LineEdit.new()
 	e.placeholder_text = placeholder
 	e.virtual_keyboard_type = kbd
-	e.custom_minimum_size = Vector2(0, 44)
-	e.add_theme_font_size_override("font_size", 16)
-	e.add_theme_stylebox_override("normal", _box(Color(0, 0, 0, 0.35), Color(1, 1, 1, 0.16), 10, 1, 8, 12))
-	e.add_theme_stylebox_override("focus", _box(Color(0, 0, 0, 0.45), accent, 10, 2, 8, 12))
-	e.add_theme_color_override("font_color", Color.WHITE)
+	e.custom_minimum_size = Vector2(0, 46)
+	e.add_theme_font_size_override("font_size", 17)
+	e.add_theme_stylebox_override("normal", _box(Color("#0e0f11"), LINE, 6, 1, 8, 12))
+	e.add_theme_stylebox_override("focus", _box(Color("#0e0f11"), accent, 6, 2, 8, 12))
+	e.add_theme_color_override("font_color", TEXT)
 	e.add_theme_color_override("font_placeholder_color", FAINT)
+	e.add_theme_color_override("caret_color", accent)
 	parent.add_child(e)
 	e.focus_entered.connect(func():
 		await get_tree().create_timer(0.35).timeout
@@ -552,17 +706,30 @@ func _build_signin() -> void:
 	col.mouse_filter = Control.MOUSE_FILTER_PASS
 	wrap.add_child(col)
 
-	var hero := HeroArt.new()
-	hero.custom_minimum_size = Vector2(0, 120 if not wide else 100)
-	hero.top = Color("#1a2a5e")
-	hero.glow = accent
-	col.add_child(hero)
-	var t := _label(col, "Welcome", 28, Color.WHITE)
-	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var sub := _label(col, "Create your account to get your own games, themes and updates.", 14, DIM)
+	# logo block
+	var logo_row := HBoxContainer.new()
+	logo_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	logo_row.add_theme_constant_override("separation", 12)
+	logo_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(logo_row)
+	var st := Icon.new().setup("star", accent, 54 if not wide else 44)
+	st.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	logo_row.add_child(st)
+	var wm := VBoxContainer.new()
+	wm.add_theme_constant_override("separation", -6)
+	wm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	logo_row.add_child(wm)
+	_title(wm, "PRIVATE", 38, TEXT)
+	_title(wm, "GAMES", 38, accent)
+	var rule := ColorRect.new()
+	rule.color = accent
+	rule.custom_minimum_size = Vector2(56, 3)
+	rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(rule)
+	var sub := _label(col, "Create your account to get your own games, themes and updates.", 15, DIM)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	var card := _card(col, Color(1, 1, 1, 0.12), Color(0, 0, 0, 0.35), 16)
+	var card := _card(col, LINE, SURF, 16)
 	card.add_theme_constant_override("separation", 6)
 	var name_e := _field(card, "Full name", "Your name")
 	var user_e := _field(card, "Username", "letters, numbers, _ or .")
@@ -570,7 +737,7 @@ func _build_signin() -> void:
 	var phone_e := _field(card, "Phone (or email above)", "+1 555 123 4567", LineEdit.KEYBOARD_TYPE_PHONE)
 	var agree := {"on": false}
 	var arow := PanelContainer.new()
-	arow.add_theme_stylebox_override("panel", _box(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.14), 10, 1, 9, 10))
+	arow.add_theme_stylebox_override("panel", _box(Color("#0e0f11"), LINE, 6, 1, 9, 10))
 	card.add_child(arow)
 	var ah := HBoxContainer.new()
 	ah.add_theme_constant_override("separation", 10)
@@ -586,8 +753,8 @@ func _build_signin() -> void:
 	var lrow := HBoxContainer.new()
 	lrow.add_theme_constant_override("separation", 8)
 	card.add_child(lrow)
-	_button(lrow, "Read Terms", func(): _read_legal("terms"), false).custom_minimum_size = Vector2(0, 38)
-	_button(lrow, "Read Privacy", func(): _read_legal("privacy"), false).custom_minimum_size = Vector2(0, 38)
+	_button(lrow, "Read Terms", func(): _read_legal("terms"), false).custom_minimum_size = Vector2(0, 40)
+	_button(lrow, "Read Privacy", func(): _read_legal("privacy"), false).custom_minimum_size = Vector2(0, 40)
 	var err := _label(card, "", 13, BAD)
 	_button(card, "Create account", func():
 		if not agree["on"]:
@@ -607,13 +774,12 @@ func _build_signin() -> void:
 	_animate_in(col)
 
 
-# ---------------------------------------------------------------- play tab
+# ---------------------------------------------------------------- games tab
 
 func _build_play() -> void:
-	var acct := Profile.account()
 	var nm := str(Profile.data.get("display_name", "friend"))
 
-	# greeting + stats
+	# greeting
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 12)
 	content.add_child(top)
@@ -621,109 +787,123 @@ func _build_play() -> void:
 	var tcol := VBoxContainer.new()
 	tcol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tcol.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	tcol.add_theme_constant_override("separation", 0)
+	tcol.add_theme_constant_override("separation", -2)
 	top.add_child(tcol)
-	_label(tcol, "Welcome back", 13, DIM)
-	_label(tcol, nm, 21, Color.WHITE)
+	_label(tcol, "WELCOME BACK", 13, FAINT)
+	_title(tcol, nm, 26, TEXT)
 
 	_update_banner()
 
 	var msg: String = Profile.data.get("message", "")
 	if msg != "":
-		var b := _card(content, Color(accent, 0.6), Color(accent, 0.14), 12)
+		var b := _card(content, Color(accent, 0.55), Color(accent, 0.08), 12)
 		_label(b, msg, 14, TEXT)
 
+	_section(content, "Your games")
 	var games: Array = Profile.manifest.get("games", [])
 	for game in games:
-		_game_block(game)
+		_game_card(content, game)
 
 
 func _update_banner() -> void:
 	if Updater.ready_to_restart:
-		var v := _card(content, Color(GOOD, 0.7), Color(GOOD, 0.14), 12)
-		_label(v, "An update was downloaded. Close the app and open it again to use it.", 14, TEXT)
-		_button(v, "Close app now", func(): get_tree().quit(), true, true)
+		var v := _card(content, Color(GOOD, 0.7), Color(GOOD, 0.1), 14)
+		_title(v, "Update ready", 22, GOOD, true)
+		_label(v, "The app will close and open itself again with the new version.", 14, TEXT)
+		_button(v, "Restart now", func(): Updater.restart_app())
 	elif apk_url != "":
-		var v2 := _card(content, Color(GOLD, 0.7), Color(GOLD, 0.12), 12)
-		_label(v2, "A new version of the app is ready to install.", 14, TEXT)
+		var v2 := _card(content, Color(GOLD, 0.7), Color(GOLD, 0.1), 14)
+		_title(v2, "New app version", 22, GOLD, true)
+		_label(v2, "Tap Download, then open the file when it finishes and tap Install. When Android says it's done, tap Open.", 14, TEXT)
 		_button(v2, "Download new version", func(): OS.shell_open(apk_url))
 
 
-func _game_block(game: Dictionary) -> void:
+func _done_count(game: Dictionary) -> int:
+	var n := 0
+	for lv in game.get("levels", []):
+		if Profile.is_completed(lv["id"]):
+			n += 1
+	return n
+
+
+## One game on the home screen: live preview on the left, title, progress and
+## the Play button on the right. Tapping anywhere else opens the game's page.
+func _game_card(parent: Control, game: Dictionary) -> void:
 	var soon: bool = game.get("coming_soon", false)
 	var owned: bool = _owned(game) and not soon
 	var levels: Array = game.get("levels", [])
+	var done := _done_count(game)
+	var tw := 320.0 if wide else 138.0
+	var th := 190.0 if wide else 172.0
 
-	# hero banner
-	var hero_h := 190.0 if wide else 170.0
-	var hp := PanelContainer.new()
-	var sbh := _box(Color(0, 0, 0, 0), Color(accent, 0.55) if owned else Color(1, 1, 1, 0.12), 18, 1, 0, 0)
-	sbh.shadow_color = Color(0, 0, 0, 0.4)
-	sbh.shadow_size = 8
-	hp.add_theme_stylebox_override("panel", sbh)
-	hp.clip_contents = true
-	hp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hp.mouse_filter = Control.MOUSE_FILTER_PASS
-	content.add_child(hp)
-	var stack := Control.new()
-	stack.custom_minimum_size = Vector2(0, hero_h if owned else 110.0)
-	stack.mouse_filter = Control.MOUSE_FILTER_PASS
-	hp.add_child(stack)
-	var art := HeroArt.new()
-	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	art.glow = accent
-	art.dim = not owned
-	stack.add_child(art)
-	var over := VBoxContainer.new()
-	over.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	over.alignment = BoxContainer.ALIGNMENT_END
-	over.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	over.add_theme_constant_override("separation", 2)
-	var om := MarginContainer.new()
-	om.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	om.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for s in ["left", "right", "bottom", "top"]:
-		om.add_theme_constant_override("margin_" + s, 14)
-	stack.add_child(om)
-	om.add_child(over)
-	_label(over, str(game.get("subtitle", "")).to_upper(), 12, accent.lightened(0.3))
-	_label(over, str(game["title"]), 30 if owned else 24, Color.WHITE)
-	if owned:
-		var d := _label(over, str(game.get("desc", "")), 13, DIM)
-		d.custom_minimum_size = Vector2(200, 0)
-		var go := HBoxContainer.new()
-		go.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		over.add_child(go)
-		var nxt := _next_level(game)
-		var lv_title := _clean_title(nxt)
-		var pb := _button(go, "Play  ·  " + lv_title, func(): _launch(game, nxt["id"]))
-		pb.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-		pb.custom_minimum_size = Vector2(0, 42)
-	elif soon:
-		_label(over, "Coming soon", 14, GOLD)
-	else:
-		_label(over, "Not unlocked for your account", 13, Color(1, 0.6, 0.4))
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _slant(_box(SURF, Color(accent, 0.55) if owned else LINE, 6, 1, 0, 0), 20, 5))
+	card.clip_contents = true
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
+	parent.add_child(card)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 0)
+	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(hb)
+
+	var tbox := Control.new()
+	tbox.custom_minimum_size = Vector2(tw, th)
+	tbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tbox.clip_contents = true
+	hb.add_child(tbox)
+	var poster: String = str(levels[0]["id"]) if not levels.is_empty() else ""
+	var tz := TeaserScript.new().setup(str(game["id"]), poster)
+	tz.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	tbox.add_child(tz)
 	if not owned:
-		return
+		var shade := ColorRect.new()
+		shade.color = Color(0, 0, 0, 0.6)
+		shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tbox.add_child(shade)
+	var edge := ColorRect.new()
+	edge.color = accent if owned else LINE
+	edge.anchor_left = 1.0
+	edge.anchor_right = 1.0
+	edge.anchor_bottom = 1.0
+	edge.offset_left = -3.0
+	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tbox.add_child(edge)
 
-	# levels
-	var done := 0
-	for lv in levels:
-		if Profile.is_completed(lv["id"]):
-			done += 1
-	var hdr := HBoxContainer.new()
-	content.add_child(hdr)
-	var sh := _section(hdr, "Levels")
-	sh.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_label(hdr, "%d / %d done" % [done, levels.size()], 12, DIM, false).size_flags_horizontal = Control.SIZE_SHRINK_END
-	var grid := GridContainer.new()
-	grid.columns = 2 if wide else 1
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 10)
-	grid.mouse_filter = Control.MOUSE_FILTER_PASS
-	content.add_child(grid)
-	for i in levels.size():
-		_level_tile(grid, game, i)
+	var mc := MarginContainer.new()
+	mc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for s in ["left", "right", "top", "bottom"]:
+		mc.add_theme_constant_override("margin_" + s, 14)
+	hb.add_child(mc)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mc.add_child(v)
+	_title(v, str(game.get("subtitle", "")), 14, accent if owned else FAINT, true)
+	_label(v, str(game["title"]), 26, TEXT)
+	if owned and not levels.is_empty():
+		var nxt := _next_level(game)
+		var nl := _label(v, "Next: " + _clean_title(nxt), 13, DIM)
+		var pr := HBoxContainer.new()
+		pr.add_theme_constant_override("separation", 8)
+		pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(pr)
+		_bar(pr, float(done) / float(levels.size()), accent)
+		_label(pr, "%d/%d" % [done, levels.size()], 13, DIM, false)
+		var fill := Control.new()
+		fill.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(fill)
+		var all_done := done >= levels.size()
+		var pb := _button(v, "Replay" if all_done else ("Continue" if done > 0 else "Play"), func(): _launch(game, nxt["id"]))
+		pb.custom_minimum_size = Vector2(0, 44)
+		_tap(card, func(): _open_hub(game))
+	elif soon:
+		_label(v, "Coming soon", 14, GOLD)
+	else:
+		_label(v, "Not unlocked for your account", 13, Color("#ff9a6b"))
 
 
 func _next_level(game: Dictionary) -> Dictionary:
@@ -740,37 +920,374 @@ func _clean_title(lv: Dictionary) -> String:
 	return parts[1] if parts.size() > 1 else t
 
 
-func _level_tile(parent: Control, game: Dictionary, i: int) -> void:
-	var lv: Dictionary = game["levels"][i]
-	var ok := _level_ok(game, i)
-	var done := Profile.is_completed(lv["id"])
-	var p := PanelContainer.new()
-	var col := GOOD if done else (accent if ok else FAINT)
-	p.add_theme_stylebox_override("panel", _box(Color(1, 1, 1, 0.06 if ok else 0.03), Color(col, 0.45 if ok else 0.18), 14, 1, 10, 12))
-	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	parent.add_child(p)
+# ---------------------------------------------------------------- game hub
+# The page of one game: big preview, Play/Continue, then Levels / How to play /
+# Options. It sits on top of the launcher like a small app of its own.
+
+const HUB_TABS := [["levels", "Levels"], ["howto", "How to play"], ["options", "Options"]]
+
+
+func _open_hub(game: Dictionary) -> void:
+	_close_hub(false)
+	hub_game = game
+	hub_tab = "levels"
+	resume_hub = str(game["id"])
+	if ui and is_instance_valid(ui):
+		ui.visible = false
+	hub = Control.new()
+	hub.name = "Hub"
+	hub.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(hub)
+	var m := get_node_or_null("Modal")
+	if m:
+		move_child(m, -1)
+	var bgp := BgArt.new()
+	bgp.top = _theme_color("bg_top", BG_TOP)
+	bgp.bottom = _theme_color("bg_bottom", BG_BOTTOM)
+	bgp.accent = accent
+	hub.add_child(bgp)
+
+	var ins := _insets()
+	var outer := MarginContainer.new()
+	outer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	outer.add_theme_constant_override("margin_left", int(ins.x))
+	outer.add_theme_constant_override("margin_right", int(ins.z))
+	outer.add_theme_constant_override("margin_top", int(ins.y))
+	outer.add_theme_constant_override("margin_bottom", int(ins.w))
+	hub.add_child(outer)
+	var main := VBoxContainer.new()
+	main.add_theme_constant_override("separation", 0)
+	outer.add_child(main)
+
+	# header: back, game name, points
+	var header := MarginContainer.new()
+	header.add_theme_constant_override("margin_left", 14)
+	header.add_theme_constant_override("margin_right", 18)
+	header.add_theme_constant_override("margin_top", 12)
+	header.add_theme_constant_override("margin_bottom", 8)
+	main.add_child(header)
 	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 12)
+	hb.add_theme_constant_override("separation", 10)
+	header.add_child(hb)
+	var back := PanelContainer.new()
+	back.add_theme_stylebox_override("panel", _box(SURF2, LINE, 8, 1, 10, 12))
+	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hb.add_child(back)
+	back.add_child(Icon.new().setup("back", TEXT, 22))
+	_tap(back, func(): _close_hub())
+	var ht := _title(hb, str(game["title"]), 26, TEXT, true)
+	ht.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ht.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hb.add_child(_coin_chip(true))
+
+	var left: VBoxContainer = null
+	var right_parent: Control = main
+	if wide:
+		var row := HBoxContainer.new()
+		row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		row.add_theme_constant_override("separation", 18)
+		main.add_child(row)
+		var lm := MarginContainer.new()
+		lm.custom_minimum_size = Vector2(minf(size.x * 0.4, 440.0), 0)
+		lm.add_theme_constant_override("margin_left", 18)
+		lm.add_theme_constant_override("margin_bottom", 18)
+		row.add_child(lm)
+		left = VBoxContainer.new()
+		left.add_theme_constant_override("separation", 12)
+		lm.add_child(left)
+		right_parent = row
+
+	hub_scroll = ScrollContainer.new()
+	hub_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hub_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hub_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	hub_scroll.scroll_deadzone = 8
+	right_parent.add_child(hub_scroll)
+	var holder := MarginContainer.new()
+	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	holder.mouse_filter = Control.MOUSE_FILTER_PASS
+	holder.add_theme_constant_override("margin_top", 6)
+	holder.add_theme_constant_override("margin_bottom", 28)
+	hub_scroll.add_child(holder)
+	var cv := VBoxContainer.new()
+	cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cv.mouse_filter = Control.MOUSE_FILTER_PASS
+	cv.add_theme_constant_override("separation", 12)
+	holder.add_child(cv)
+	var sc := hub_scroll
+	hub_scroll.resized.connect(func():
+		var mg := 18 if wide else int(maxf(18.0, (sc.size.x - MAX_W) / 2.0))
+		holder.add_theme_constant_override("margin_left", mg)
+		holder.add_theme_constant_override("margin_right", 18 if wide else mg))
+
+	var top_parent: Control = left if left else cv
+	_hub_hero(top_parent, game)
+	_hub_progress(top_parent, game)
+	_hub_play_button(top_parent, game)
+	_hub_tabbar(cv)
+	hub_body = VBoxContainer.new()
+	hub_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hub_body.mouse_filter = Control.MOUSE_FILTER_PASS
+	hub_body.add_theme_constant_override("separation", 10)
+	cv.add_child(hub_body)
+	_hub_render()
+	hub.modulate.a = 0.0
+	hub.create_tween().tween_property(hub, "modulate:a", 1.0, 0.18)
+
+
+func _close_hub(restore := true) -> void:
+	if hub and is_instance_valid(hub):
+		hub.queue_free()
+	hub = null
+	hub_body = null
+	hub_points = null
+	hub_tabs.clear()
+	if restore:
+		resume_hub = ""
+		if ui and is_instance_valid(ui):
+			ui.visible = true
+			if content and is_instance_valid(content):
+				_show(tab) ## progress may have changed while playing
+
+
+func _hub_hero(parent: Control, game: Dictionary) -> void:
+	var levels: Array = game.get("levels", [])
+	var hp := PanelContainer.new()
+	hp.add_theme_stylebox_override("panel", _slant(_box(SURF, Color(accent, 0.55), 6, 1, 0, 0), 24, 6))
+	hp.clip_contents = true
+	hp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hp.mouse_filter = Control.MOUSE_FILTER_PASS
+	parent.add_child(hp)
+	var stack := Control.new()
+	stack.custom_minimum_size = Vector2(0, 250.0 if wide else 212.0)
+	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp.add_child(stack)
+	var poster: String = str(levels[0]["id"]) if not levels.is_empty() else ""
+	var tz := TeaserScript.new().setup(str(game["id"]), poster)
+	tz.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stack.add_child(tz)
+	_scrim(stack, true, 0.92)
+	var om := MarginContainer.new()
+	om.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	om.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for s in ["left", "right", "bottom", "top"]:
+		om.add_theme_constant_override("margin_" + s, 16)
+	stack.add_child(om)
+	var over := VBoxContainer.new()
+	over.alignment = BoxContainer.ALIGNMENT_END
+	over.add_theme_constant_override("separation", 0)
+	over.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	om.add_child(over)
+	_title(over, str(game.get("subtitle", "")), 15, accent, true)
+	_label(over, str(game["title"]), 40, TEXT)
+	_label(over, str(game.get("desc", "")), 14, Color(TEXT, 0.8))
+
+
+func _hub_progress(parent: Control, game: Dictionary) -> void:
+	var levels: Array = game.get("levels", [])
+	var done := _done_count(game)
+	var c := _card(parent, LINE, SURF, 12)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 14)
 	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	p.add_child(hb)
-	_badge(hb, str(i + 1), col, 38)
+	c.add_child(hb)
+	var big := _title(hb, "%d/%d" % [done, levels.size()], 32, accent)
+	big.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var v := VBoxContainer.new()
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	v.add_theme_constant_override("separation", 1)
+	v.add_theme_constant_override("separation", 5)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(v)
-	_label(v, _clean_title(lv), 16, TEXT if ok else DIM)
-	_label(v, str(lv.get("desc", "")), 12, DIM if ok else FAINT)
-	var kind := "check" if done else ("chev" if ok else "lock")
-	var ic := Icon.new().setup(kind, col, 20)
-	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	hb.add_child(ic)
+	_label(v, "LEVELS COMPLETE", 13, DIM)
+	_bar(v, float(done) / maxf(float(levels.size()), 1.0), accent, 8)
+
+
+func _hub_play_button(parent: Control, game: Dictionary) -> void:
+	var levels: Array = game.get("levels", [])
+	if levels.is_empty():
+		return
+	var nxt := _next_level(game)
+	var done := _done_count(game)
+	var verb := "Replay" if done >= levels.size() else ("Continue" if done > 0 else "Play")
+	var b := _button(parent, "%s  ·  %s" % [verb, _clean_title(nxt)], func(): _launch(game, nxt["id"], true))
+	b.custom_minimum_size = Vector2(0, 56)
+
+
+func _hub_tabbar(parent: Control) -> void:
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 0)
+	hb.mouse_filter = Control.MOUSE_FILTER_PASS
+	parent.add_child(hb)
+	hub_tabs.clear()
+	for t in HUB_TABS:
+		var id: String = t[0]
+		var p := PanelContainer.new()
+		p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var l := Label.new()
+		l.text = str(t[1]).to_upper()
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.add_theme_font_override("font", F_DISPLAY)
+		l.add_theme_font_size_override("font_size", 21)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		p.add_child(l)
+		hb.add_child(p)
+		_tap(p, func():
+			hub_tab = id
+			_hub_render())
+		hub_tabs[id] = {"panel": p, "label": l}
+
+
+func _hub_style_tabs() -> void:
+	for id in hub_tabs:
+		var on: bool = id == hub_tab
+		var it: Dictionary = hub_tabs[id]
+		var sb := _box(Color(0, 0, 0, 0), accent if on else LINE, 0, 0, 10, 6)
+		sb.border_width_bottom = 3 if on else 1
+		(it["panel"] as PanelContainer).add_theme_stylebox_override("panel", sb)
+		(it["label"] as Label).add_theme_color_override("font_color", TEXT if on else FAINT)
+
+
+func _hub_render() -> void:
+	if hub_body == null or not is_instance_valid(hub_body):
+		return
+	_hub_style_tabs()
+	for c in hub_body.get_children():
+		hub_body.remove_child(c)
+		c.queue_free()
+	match hub_tab:
+		"howto":
+			_hub_howto(hub_body, hub_game)
+		"options":
+			_hub_options(hub_body, hub_game)
+		_:
+			_hub_levels(hub_body, hub_game)
+	_animate_in(hub_body)
+
+
+func _hub_levels(parent: Control, game: Dictionary) -> void:
+	var levels: Array = game.get("levels", [])
+	var nxt := _next_level(game)
+	for i in levels.size():
+		_level_row(parent, game, i, str(levels[i]["id"]) == str(nxt["id"]))
+
+
+func _level_row(parent: Control, game: Dictionary, i: int, is_next: bool) -> void:
+	var lv: Dictionary = game["levels"][i]
+	var ok := _level_ok(game, i)
+	var done := Profile.is_completed(lv["id"])
+	var col := GOOD if done else (accent if ok else FAINT)
+	var p := PanelContainer.new()
+	var border := Color(accent, 0.8) if (is_next and ok) else (Color(GOOD, 0.35) if done else LINE)
+	p.add_theme_stylebox_override("panel", _slant(_box(SURF if ok else Color("#111214"), border, 6, 1, 0, 0), 14, 4))
+	p.clip_contents = true
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(p)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 0)
+	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(hb)
+
+	# picture of the level (real screenshot from the game)
+	var tb := Control.new()
+	tb.custom_minimum_size = Vector2(132, 82)
+	tb.clip_contents = true
+	tb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hb.add_child(tb)
+	var path := "res://assets/levels/%s.jpg" % str(lv["id"])
+	if ResourceLoader.exists(path):
+		var tr := TextureRect.new()
+		tr.texture = load(path)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		tr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if not ok:
+			tr.modulate = Color(0.35, 0.35, 0.35)
+		tb.add_child(tr)
+	else:
+		var ph := ColorRect.new()
+		ph.color = SURF2
+		ph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		ph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tb.add_child(ph)
+	var num := PanelContainer.new()
+	num.add_theme_stylebox_override("panel", _slant(_box(Color(0, 0, 0, 0.72), Color(0, 0, 0, 0), 4, 0, 1, 9), 8, 2))
+	num.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tb.add_child(num)
+	_title(num, str(i + 1), 20, col)
+	if not ok:
+		var lk := Icon.new().setup("lock", TEXT, 26)
+		lk.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+		lk.position = Vector2(132 / 2.0 - 13, 82 / 2.0 - 13)
+		tb.add_child(lk)
+
+	var mc := MarginContainer.new()
+	mc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mc.add_theme_constant_override("margin_left", 12)
+	mc.add_theme_constant_override("margin_right", 12)
+	mc.add_theme_constant_override("margin_top", 8)
+	mc.add_theme_constant_override("margin_bottom", 8)
+	hb.add_child(mc)
+	var v := VBoxContainer.new()
+	v.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	v.add_theme_constant_override("separation", 1)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mc.add_child(v)
+	_label(v, _clean_title(lv), 21, TEXT if ok else DIM)
+	var dl := _label(v, str(lv.get("desc", "")), 12, DIM if ok else FAINT)
+	dl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+
+	var rm := MarginContainer.new()
+	rm.add_theme_constant_override("margin_right", 12)
+	rm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hb.add_child(rm)
+	if done:
+		var ic := Icon.new().setup("check", GOOD, 22)
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		rm.add_child(ic)
+	elif ok:
+		var ic2 := Icon.new().setup("chev", accent if is_next else DIM, 22)
+		ic2.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		rm.add_child(ic2)
 	if ok:
 		var id: String = lv["id"]
-		_tap(p, func(): _launch(game, id))
+		_tap(p, func(): _launch(game, id, true))
 	else:
 		p.mouse_filter = Control.MOUSE_FILTER_PASS
+
+
+func _hub_howto(parent: Control, game: Dictionary) -> void:
+	var pages: Array = game.get("howto", [])
+	if pages.is_empty():
+		_label(parent, "No guide for this game yet.", 14, DIM)
+		return
+	for pg in pages:
+		var body := str(pg["body"]).replace("{controls}", _controls_text()).replace("{runner_controls}", _runner_controls_text())
+		var c := _card(parent, LINE, SURF, 14)
+		_title(c, str(pg["title"]), 22, accent, true)
+		_label(c, body, 15, TEXT)
+
+
+func _hub_options(parent: Control, game: Dictionary) -> void:
+	var c := _card(parent, LINE, SURF, 14)
+	_section(c, "Controls and view")
+	match str(game["id"]):
+		"fighter":
+			_segment(c, "Controls", ["Joystick", "D-pad", "Tilt"], int(Profile.get_setting("controls", 0)), func(i): Profile.set_setting("controls", i), _hub_render)
+			_segment(c, "Camera", ["Behind me", "My eyes"], int(Profile.get_setting("camera_view", 0)), func(i): Profile.set_setting("camera_view", i), _hub_render)
+			_label(c, "My eyes: first-person, you see through the character's eyes. Drag the right side of the screen to look around.", 12, FAINT)
+		"runner":
+			_segment(c, "Runner controls", ["Swipe", "Buttons", "Tilt"], int(Profile.get_setting("runner_controls", 0)), func(i): Profile.set_setting("runner_controls", i), _hub_render)
+			_label(c, "Swipe on the screen, or show on-screen buttons, or tilt to steer.", 12, FAINT)
+		_:
+			_label(c, "This game has no special controls to set.", 13, DIM)
+	var quals := ["auto", "low", "high"]
+	_segment(c, "Graphics", ["Auto", "Smooth", "Best"], maxi(quals.find(str(Profile.get_setting("quality", "auto"))), 0), func(i): Profile.set_setting("quality", quals[i]), _hub_render)
+	_label(c, "Smooth keeps tablets cool and fast. Auto picks Smooth on phones.", 12, FAINT)
+	_button(c, "Show the how-to-play pop-up again", func(): _howto(game), false)
 
 
 # ---------------------------------------------------------------- shop tab
@@ -785,7 +1302,7 @@ func _build_shop() -> void:
 	grid.mouse_filter = Control.MOUSE_FILTER_PASS
 	content.add_child(grid)
 	for item in Profile.manifest.get("shop", []):
-		var v := _card(grid, Color(1, 1, 1, 0.1), Color(1, 1, 1, 0.06), 14)
+		var v := _card(grid, LINE, SURF, 14)
 		var hb := HBoxContainer.new()
 		hb.add_theme_constant_override("separation", 10)
 		hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -809,7 +1326,7 @@ func _build_shop() -> void:
 				_show("shop"), can, can)
 
 
-# ---------------------------------------------------------------- settings tab
+
 
 func _row(parent: Control, left: String, right: String, right_col := DIM) -> void:
 	var hb := HBoxContainer.new()
@@ -821,7 +1338,8 @@ func _row(parent: Control, left: String, right: String, right_col := DIM) -> voi
 	r.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 
-func _segment(parent: Control, caption: String, options: Array, current: int, cb: Callable) -> void:
+
+func _segment(parent: Control, caption: String, options: Array, current: int, cb: Callable, refresh := Callable()) -> void:
 	_label(parent, caption, 14, TEXT)
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 6)
@@ -831,14 +1349,17 @@ func _segment(parent: Control, caption: String, options: Array, current: int, cb
 		var on := i == current
 		var p := PanelContainer.new()
 		p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		p.add_theme_stylebox_override("panel", _box(Color(accent, 0.25) if on else Color(1, 1, 1, 0.05), accent if on else Color(1, 1, 1, 0.14), 10, 1, 10, 6))
-		var l := _label(p, str(options[i]), 14, Color.WHITE if on else DIM, false)
+		p.add_theme_stylebox_override("panel", _box(Color(accent, 0.2) if on else Color("#0e0f11"), accent if on else LINE, 6, 1, 10, 6))
+		var l := _label(p, str(options[i]), 14, TEXT if on else DIM, false)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hb.add_child(p)
 		var idx := i
 		_tap(p, func():
 			cb.call(idx)
-			_show("settings"))
+			if refresh.is_null():
+				_show("settings")
+			else:
+				refresh.call())
 
 
 func _build_settings() -> void:
@@ -877,7 +1398,11 @@ func _build_settings() -> void:
 
 	var upd := _card(content)
 	_section(upd, "App updates")
-	update_status = _label(upd, Updater.last_status if Updater.last_status != "" else "Updates install automatically.", 14, Color("#9ad1ff"))
+	update_status = _label(upd, Updater.last_status if Updater.last_status != "" else "Updates install automatically.", 14, accent.lightened(0.2))
+	if Updater.ready_to_restart:
+		_button(upd, "Restart now", func(): Updater.restart_app())
+	elif apk_url != "":
+		_button(upd, "Download new version", func(): OS.shell_open(apk_url))
 	_button(upd, "Check for updates", func():
 		up.run(), false)
 	_label(upd, "Version %s  ·  app build %d" % [_ver().trim_prefix("v"), Updater.BINARY_VERSION], 12, FAINT)
@@ -935,7 +1460,8 @@ func _level_ok(game: Dictionary, i: int) -> bool:
 
 
 ## Start a level; the first time for a game, show its instructions first.
-func _launch(game: Dictionary, level_id: String) -> void:
+func _launch(game: Dictionary, level_id: String, from_hub := false) -> void:
+	resume_hub = str(game["id"]) if from_hub else ""
 	var seen: Dictionary = Profile.data.get("onboarded", {})
 	if game.has("howto") and not bool(seen.get(game["id"], false)):
 		_howto(game, func():
@@ -957,6 +1483,7 @@ func _close_modal() -> void:
 ## Returns {"body": VBox (scrolls), "foot": VBox (buttons)}.
 func _modal(title: String, dismissable := true) -> Dictionary:
 	_close_modal()
+	_modal_dismissable = dismissable
 	var ov := Control.new()
 	ov.name = "Modal"
 	ov.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -974,7 +1501,7 @@ func _modal(title: String, dismissable := true) -> Dictionary:
 	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ov.add_child(cc)
 	var panel := PanelContainer.new()
-	var sb := _box(Color("#0f1738"), Color(accent, 0.7), 20, 1, 18, 18)
+	var sb := _slant(_box(SURF, Color(accent, 0.6), 6, 1, 18, 18), 20, 6)
 	sb.shadow_size = 14
 	sb.shadow_color = Color(0, 0, 0, 0.5)
 	panel.add_theme_stylebox_override("panel", sb)
@@ -1063,7 +1590,7 @@ func _toast(title: String, body: String) -> void:
 	if _toast_node and is_instance_valid(_toast_node):
 		_toast_node.queue_free()
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", _box(Color("#16225a"), accent, 16, 1, 10, 14))
+	p.add_theme_stylebox_override("panel", _slant(_box(SURF2, accent, 6, 1, 10, 14), 14, 4))
 	p.custom_minimum_size = Vector2(minf(size.x - 32.0, 460.0), 0)
 	p.position = Vector2((size.x - minf(size.x - 32.0, 460.0)) / 2.0, -120)
 	var v := VBoxContainer.new()

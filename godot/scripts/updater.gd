@@ -19,6 +19,40 @@ static var checked_this_session := false
 static var boot_content := 0 ## content version that is actually running
 
 
+## Close the app and open it again by itself so a downloaded update is used.
+## On Android a short "alarm" is set to start the app again right after it
+## closes. If anything about that is not available, the app just closes
+## (the old behaviour) and has to be opened by hand.
+static func restart_app() -> void:
+	if OS.get_name() == "Android":
+		_schedule_android_relaunch()
+	elif not OS.has_feature("editor"):
+		OS.set_restart_on_exit(true)
+	(Engine.get_main_loop() as SceneTree).quit()
+
+
+static func _schedule_android_relaunch() -> bool:
+	if not Engine.has_singleton("AndroidRuntime"):
+		return false
+	var rt: Object = Engine.get_singleton("AndroidRuntime")
+	var ctx: Object = rt.getApplicationContext()
+	if ctx == null:
+		return false
+	var pm: Object = ctx.getPackageManager()
+	var intent: Object = pm.getLaunchIntentForPackage(ctx.getPackageName())
+	if intent == null:
+		return false
+	intent.addFlags(0x10008000) ## NEW_TASK | CLEAR_TASK
+	var pi_class: Object = JavaClassWrapper.wrap("android.app.PendingIntent")
+	var pi: Object = pi_class.getActivity(ctx, 4242, intent, 0x04000000 | 0x10000000) ## IMMUTABLE | CANCEL_CURRENT
+	var alarm: Object = ctx.getSystemService("alarm")
+	var sys: Object = JavaClassWrapper.wrap("java.lang.System")
+	if pi == null or alarm == null or sys == null:
+		return false
+	alarm.setAndAllowWhileIdle(1, int(sys.currentTimeMillis()) + 500, pi) ## RTC, in 0.5 s
+	return true
+
+
 static func installed_content() -> int:
 	var meta := read_meta()
 	return maxi(int(meta.get("content", 0)), BASE_CONTENT)
@@ -102,7 +136,7 @@ func run(base_override := "") -> void:
 	f.store_string(JSON.stringify({"content": content, "notes": str(info.get("notes", "")), "api_url": str(read_meta().get("api_url", ""))}))
 	f.close()
 	ready_to_restart = true
-	_say("Update v%d installed. Close and reopen the app to use it." % content)
+	_say("Update v%d installed. Tap Restart to use it." % content)
 
 
 ## The feed can announce the backend address ("api_url"), so the server can be
