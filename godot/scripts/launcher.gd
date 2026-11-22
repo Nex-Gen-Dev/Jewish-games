@@ -5,12 +5,13 @@ extends Control
 ## shows a sign-in (name, username, email or phone) that creates a user ID.
 ## Tapping a game opens its own "game hub" page (levels, how to play, options).
 
-const APP_VERSION := "1.2"
+const APP_VERSION := "1.3"
 const MAX_W := 900.0
 const Icon := preload("res://scripts/ui_icon.gd")
 const AppLog := preload("res://scripts/applog.gd")
 const TeaserScript := preload("res://scripts/teaser.gd")
 const BgArt := preload("res://scripts/bg_art.gd")
+const MARK: Texture2D = preload("res://assets/brand/mark.png")
 const F_DISPLAY: Font = preload("res://assets/fonts/BarlowCondensed-Bold.ttf")
 const F_BODY: Font = preload("res://assets/fonts/Barlow-Medium.ttf")
 const F_STRONG: Font = preload("res://assets/fonts/Barlow-SemiBold.ttf")
@@ -235,9 +236,7 @@ func _build_frame() -> void:
 	hb.add_theme_constant_override("separation", 10)
 	header.add_child(hb)
 	if not wide:
-		var logo := Icon.new().setup("star", accent, 26)
-		logo.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		hb.add_child(logo)
+		hb.add_child(_logo(32))
 	title_label = _title(hb, "Games", 28, TEXT, true)
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -281,6 +280,18 @@ func _build_frame() -> void:
 		outer.add_child(col)
 		col.add_child(main)
 		col.add_child(_bottom_nav())
+
+
+## The brand mark (amber badge with an S).
+func _logo(px: float) -> Control:
+	var tr := TextureRect.new()
+	tr.texture = MARK
+	tr.custom_minimum_size = Vector2(px, px)
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return tr
 
 
 func _bell_button() -> Control:
@@ -360,9 +371,13 @@ func _rail() -> Control:
 	var brand := HBoxContainer.new()
 	brand.add_theme_constant_override("separation", 8)
 	v.add_child(brand)
-	brand.add_child(Icon.new().setup("star", accent, 30))
-	var bl := _title(brand, "PRIVATE\nGAMES", 19, TEXT, true)
-	bl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	brand.add_child(_logo(38))
+	var bw := VBoxContainer.new()
+	bw.add_theme_constant_override("separation", -4)
+	bw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	brand.add_child(bw)
+	_title(bw, "SHTICK", 22, TEXT)
+	_title(bw, "GAMES", 15, accent)
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, 18)
 	v.add_child(gap)
@@ -416,7 +431,7 @@ func _show(which: String) -> void:
 			nb.border_width_left = 3
 			nb.border_color = accent
 		(it["panel"] as PanelContainer).add_theme_stylebox_override("panel", nb)
-	title_label.text = {"play": "PRIVATE GAMES", "shop": "SHOP", "settings": "SETTINGS"}.get(which, "")
+	title_label.text = {"play": "SHTICK GAMES", "shop": "SHOP", "settings": "SETTINGS"}.get(which, "")
 	for c in content.get_children():
 		content.remove_child(c)
 		c.queue_free()
@@ -709,18 +724,17 @@ func _build_signin() -> void:
 	# logo block
 	var logo_row := HBoxContainer.new()
 	logo_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	logo_row.add_theme_constant_override("separation", 12)
+	logo_row.add_theme_constant_override("separation", 14)
 	logo_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(logo_row)
-	var st := Icon.new().setup("star", accent, 54 if not wide else 44)
-	st.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	logo_row.add_child(st)
+	logo_row.add_child(_logo(84 if not wide else 64))
 	var wm := VBoxContainer.new()
-	wm.add_theme_constant_override("separation", -6)
+	wm.add_theme_constant_override("separation", -8)
+	wm.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	wm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	logo_row.add_child(wm)
-	_title(wm, "PRIVATE", 38, TEXT)
-	_title(wm, "GAMES", 38, accent)
+	_title(wm, "SHTICK", 48, TEXT)
+	_title(wm, "GAMES", 30, accent)
 	var rule := ColorRect.new()
 	rule.color = accent
 	rule.custom_minimum_size = Vector2(56, 3)
@@ -1439,7 +1453,7 @@ func _build_settings() -> void:
 
 	var about := _card(content)
 	_section(about, "About")
-	_label(about, "Private Games v%s. A private launcher with games made for you." % APP_VERSION, 13, DIM)
+	_label(about, "Shtick Games v%s. Games made for you." % APP_VERSION, 13, DIM)
 
 
 # ---------------------------------------------------------------- game access

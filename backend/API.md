@@ -1,4 +1,4 @@
-# Private Games API
+# Shtick Games API
 | Who | Method & path | What |
 |---|---|---|
 | app | POST /v1/register | `{user_id,name,username,email,phone,platform,model}` → `{token}` (stored on device) |

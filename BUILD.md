@@ -18,10 +18,18 @@ Source of truth for the app is `godot/` (Godot 4.3 project). Backend is `backend
 4. `git add -A && git commit && git push`. Phones pick it up within about 30 seconds of opening the app.
 Because the pack contains ALL games, always build from a freshly pulled tree so you include other sessions' work.
 
-## New APK (only when native code/binary changes: BINARY_VERSION in scripts/updater.gd)
-Export with the "Android" preset, then sign with `python3 tools/signv2.py in.apk out.apk <keystore>` (keystore password `android`).
-The signing keystore is NOT in this repo. It is stored in the Claude project doc `claude/keystore_b64.txt` (base64).
-It must be the same key every time or phones will refuse to update the app. Only the Launcher session builds APKs.
+## New APK (only when native code/binary, icon, name or splash changes: BINARY_VERSION in scripts/updater.gd)
+No Android SDK is needed. One-time sandbox setup:
+1. Fake SDK folders so Godot's export check passes: `mkdir -p S/platform-tools S/cmdline-tools/latest/bin S/build-tools/34.0.0 S/platforms/android-34`; put empty executable files `platform-tools/adb`, `build-tools/34.0.0/apksigner` in it; in `~/.config/godot/editor_settings-4.3.tres` set `export/android/android_sdk_path` to S and `export/android/java_sdk_path` to the JDK (`/usr/lib/jvm/java-21-openjdk-amd64`).
+2. Decode the keystore from the Claude project doc `claude/keystore_b64.txt` (base64 -> `release.keystore`; alias `androiddebugkey`, password `android`). Never commit it.
+3. Download `uber-apk-signer-1.3.0.jar` from github.com/patrickfav/uber-apk-signer/releases (it aligns and signs with v1+v2+v3).
+Build: `export GODOT_ANDROID_KEYSTORE_RELEASE_PATH=... GODOT_ANDROID_KEYSTORE_RELEASE_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=android`, then
+`godot --headless --path godot --export-release "Android" /tmp/t.apk`, then
+`java -jar uber-apk-signer.jar -a /tmp/t.apk --ks release.keystore --ksAlias androiddebugkey --ksPass android --ksKeyPass android --allowResign -o /tmp/out`.
+Check the printed certificate SHA256 is `ca7b76a7...2c2e` (same key as every earlier APK, or phones refuse the update). Copy to `docs/Shtick.apk`.
+Bump `version/code` in export_presets.cfg for every new APK. Set `BASE_CONTENT` in updater.gd to the content number that goes into the APK.
+The in-app update prompt (min_binary higher than BINARY_VERSION) points to `apk_url` in docs/version.json.
+Only the Launcher session builds APKs.
 
 ## Never
 - Never run tests that create accounts against production (see tests/cloud_test.gd; Updater overwrites user://update/meta.json).

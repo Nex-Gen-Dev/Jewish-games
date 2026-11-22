@@ -1,4 +1,4 @@
--- Cloudflare D1 schema for the Private Games backend.
+-- Cloudflare D1 schema for the Shtick Games backend.
 CREATE TABLE IF NOT EXISTS users (
   user_id TEXT PRIMARY KEY, name TEXT NOT NULL, username TEXT NOT NULL UNIQUE,
   email TEXT, phone TEXT, token_hash TEXT NOT NULL, platform TEXT, model TEXT,

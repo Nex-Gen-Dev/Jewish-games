@@ -10,7 +10,7 @@ signal apk_required(url: String)
 
 const FEED_URL := "https://nex-gen-dev.github.io/Jewish-games" ## baked in: users cannot change it
 const BINARY_VERSION := 3 ## bump when a new APK must be installed
-const BASE_CONTENT := 5 ## content version bundled inside the APK
+const BASE_CONTENT := 10 ## content version bundled inside the APK
 const DIR := "user://update"
 
 static var last_status := ""

@@ -1,4 +1,4 @@
-# Private Game Launcher: Godot 4.3 project
+# Shtick Games: Godot 4.3 project
 
 A mobile 3D game launcher plus the first game ("Rise & Shine", a third-person 3D fighter).
 

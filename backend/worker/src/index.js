@@ -1,6 +1,6 @@
 import { LEGAL_DEFAULT } from "./legal_default.js";
 import { ADMIN_HTML } from "./admin_html.js";
-// Private Games API (Cloudflare Worker + D1).
+// Shtick Games API (Cloudflare Worker + D1).
 const json = (o, status = 200) => new Response(JSON.stringify(o), {
   status, headers: { "content-type": "application/json", "access-control-allow-origin": "*",
     "access-control-allow-headers": "authorization,content-type", "access-control-allow-methods": "GET,POST,PUT,OPTIONS" } });
