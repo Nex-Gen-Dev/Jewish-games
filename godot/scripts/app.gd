@@ -4,6 +4,7 @@ extends Node
 const AppLog := preload("res://scripts/applog.gd")
 const CloudScript := preload("res://scripts/cloud.gd")
 const RunnerScript := preload("res://scripts/runner.gd")
+const CityScript := preload("res://scripts/city.gd")
 
 var current: Node
 var selftest_level := ""
@@ -79,13 +80,15 @@ func start_level(level_id: String) -> void:
 	var g: Node
 	if level_id.begins_with("runner"):
 		g = RunnerScript.new()
+	elif level_id.begins_with("city"):
+		g = CityScript.new()
 	else:
 		g = Game.new()
 	g.level_id = level_id
 	g.app = self
 	_swap(g)
 	if selftest_level != "":
-		var bot_script: GDScript = load("res://tests/runner_bot.gd" if level_id.begins_with("runner") else "res://tests/bot.gd")
+		var bot_script: GDScript = load("res://tests/runner_bot.gd" if level_id.begins_with("runner") else ("res://tests/city_bot.gd" if level_id.begins_with("city") else "res://tests/bot.gd"))
 		var bot: Node = bot_script.new()
 		bot.game = g
 		add_child(bot)

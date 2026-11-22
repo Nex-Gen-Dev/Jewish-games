@@ -109,6 +109,38 @@
           "body": "Collect gold coins for points. You also earn points for distance and a bonus when you reach the finish. Points work in the Shop like in every other game."
         }
       ]
+    },
+    {
+      "id": "city",
+      "title": "Erev Shabbos City",
+      "subtitle": "Open-world errands",
+      "desc": "Walk or drive through Geula and Machane Yehuda. Finish the Shabbos errands before candle lighting.",
+      "levels": [
+        {
+          "id": "city1",
+          "title": "1 · Geula & Machane Yehuda",
+          "desc": "Challah, fish, flowers, grape juice, then shul. 5 minutes."
+        }
+      ],
+      "free": true,
+      "howto": [
+        {
+          "title": "Your goal",
+          "body": "It is Erev Shabbos in Jerusalem. Do 4 errands (challah, fish, flowers, grape juice) and reach the shul before candle lighting. The clock at the top counts down and the sky turns to sunset."
+        },
+        {
+          "title": "Controls",
+          "body": "Left thumb: joystick to walk. Drag on the right side of the screen to look around. The yellow button appears when you can buy something, get in the van or get out. In the van: joystick up is gas, down is brake and reverse, left and right steer."
+        },
+        {
+          "title": "Finding your way",
+          "body": "The yellow arrow at the top points to the next errand and shows the distance. The map in the corner shows the streets, the market (orange), your van (white) and the next stop (yellow dot). A yellow beam marks the shop."
+        },
+        {
+          "title": "Traps",
+          "body": "Bumping into people costs 1 second. Cars do not stop for you: getting hit costs 3 to 4 seconds. Chatty neighbours who stop you for a chat cost 8 seconds, so walk around them. Grab the gold shekels for bonus points."
+        }
+      ]
     }
   ],
   "shop": [

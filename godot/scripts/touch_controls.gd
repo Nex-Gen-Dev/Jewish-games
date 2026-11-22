@@ -35,6 +35,7 @@ var has_bomb := false
 var act_label := ""
 var act_progress := 0.0
 var fight_buttons := true ## false hides punch/kick (shul)
+var hide_move_buttons := false ## true hides jump/dodge (city game)
 
 var buttons := {
 	"punch": {"label": "PUNCH", "color": Color("#ff9d3d"), "pos": Vector2.ZERO, "r": 38.0},
@@ -79,6 +80,8 @@ func _button_visible(id: String) -> bool:
 			return act_label != ""
 		"punch", "kick":
 			return fight_buttons
+		"jump", "dodge":
+			return not hide_move_buttons
 	return true
 
 
