@@ -26,3 +26,13 @@ It must be the same key every time or phones will refuse to update the app. Only
 ## Never
 - Never run tests that create accounts against production (see tests/cloud_test.gd; Updater overwrites user://update/meta.json).
 - Never commit the keystore or the admin token.
+
+## Game pictures and preview videos (launcher game pages)
+Convention (no manifest change needed): level picture `godot/assets/levels/<level_id>.jpg` (320x180 JPEG) and game preview
+`godot/assets/teasers/<game_id>.ogv` (448x252 Theora, about 9 s, loops, no sound). A missing picture shows a grey box.
+Record real gameplay with the HUD hidden, then cut and encode:
+1. `xvfb-run -a godot --path godot --resolution 512x288 --write-movie /tmp/clips/<level>.avi --fixed-fps 24 --quit-after 216 -- --selftest=<level> --teaser`
+2. Thumbnail: `ffmpeg -ss 4.5 -i <level>.avi -frames:v 1 -vf scale=320:180 -q:v 4 godot/assets/levels/<level>.jpg`
+3. Teaser: trim 2 s pieces from several levels, join with `xfade` (0.3 s), encode `-c:v libtheora -q:v 5 -an`.
+Run `godot --headless --path godot --import` after adding files. Launcher screenshots/flow test (offline, safe):
+`xvfb-run -a godot --path godot --resolution 540x960 -- --uishot=/tmp/shots` (also try 1200x720); prints `TEST ... PASS/FAIL`.
