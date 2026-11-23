@@ -1305,6 +1305,10 @@ func _hub_options(parent: Control, game: Dictionary) -> void:
 		"runner":
 			_segment(c, "Runner controls", ["Swipe", "Buttons", "Tilt"], int(Profile.get_setting("runner_controls", 0)), func(i): Profile.set_setting("runner_controls", i), _hub_render)
 			_label(c, "Swipe on the screen, or show on-screen buttons, or tilt to steer.", 12, FAINT)
+		"city":
+			_segment(c, "Walking controls", ["Joystick", "D-pad", "Tilt"], int(Profile.get_setting("controls", 0)), func(i): Profile.set_setting("controls", i), _hub_render)
+			_segment(c, "Car and boat steering", ["Tilt", "Slide", "Arrows", "D-pad"], int(Profile.get_setting("drive_controls", 2)), func(i): Profile.set_setting("drive_controls", i), _hub_render)
+			_label(c, "In a car or boat you always get a GAS and a BRAKE pedal on the right. Tilt: tilt the phone to steer. Slide: slide your thumb on the bar. Arrows: two steering buttons. D-pad: a cross pad (up is gas, down is brake). The VIEW button switches between chase, driver's seat and hood cameras.", 12, FAINT)
 		_:
 			_label(c, "This game has no special controls to set.", 13, DIM)
 	var quals := ["auto", "low", "high"]
@@ -1487,6 +1491,8 @@ func _build_settings() -> void:
 	_label(game, "My eyes: first-person, you see through the character's eyes. Drag the right side of the screen to look around.", 12, FAINT)
 	_segment(game, "Runner controls", ["Swipe", "Buttons", "Tilt"], int(Profile.get_setting("runner_controls", 0)), func(i): Profile.set_setting("runner_controls", i))
 	_label(game, "Street Runner: swipe on the screen, or show on-screen buttons, or tilt to steer.", 12, FAINT)
+	_segment(game, "Car and boat steering (Erev Shabbos City)", ["Tilt", "Slide", "Arrows", "D-pad"], int(Profile.get_setting("drive_controls", 2)), func(i): Profile.set_setting("drive_controls", i))
+	_label(game, "Erev Shabbos City: GAS and BRAKE pedals always show in a car or boat. Choose how you steer: tilt the phone, slide a bar, arrow buttons or a D-pad.", 12, FAINT)
 	var quals := ["auto", "low", "high"]
 	_segment(game, "Graphics", ["Auto", "Smooth", "Best"], maxi(quals.find(str(Profile.get_setting("quality", "auto"))), 0), func(i): Profile.set_setting("quality", quals[i]))
 	_label(game, "Smooth keeps tablets cool and fast. Auto picks Smooth on phones.", 12, FAINT)

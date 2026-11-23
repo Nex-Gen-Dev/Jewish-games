@@ -8,37 +8,37 @@
       "levels": [
         {
           "id": "bedroom",
-          "title": "1 \u00b7 Out of Bed",
+          "title": "1 · Out of Bed",
           "desc": "Beat the Yetzer Hara before he wins the snooze battle."
         },
         {
           "id": "street",
-          "title": "2 \u00b7 Shul on Time",
+          "title": "2 · Shul on Time",
           "desc": "Run the street, smash the alarm clock, reach shul before davening starts."
         },
         {
           "id": "shul",
-          "title": "3 \u00b7 Davening in Shul",
+          "title": "3 · Davening in Shul",
           "desc": "Put on tefillin, find your seat, stay quiet. No fighting here."
         },
         {
           "id": "market",
-          "title": "4 \u00b7 Night Market",
+          "title": "4 · Night Market",
           "desc": "Knife and rifle imps. Buy a blaster!"
         },
         {
           "id": "seder",
-          "title": "5 \u00b7 Seder Night",
+          "title": "5 · Seder Night",
           "desc": "Boss fight at the Seder table. Find the Matzahs for a mega bomb."
         },
         {
           "id": "purim",
-          "title": "6 \u00b7 Purim Street",
+          "title": "6 · Purim Street",
           "desc": "A long, crowded street. Reach the Purim Seudah in time."
         },
         {
           "id": "finale",
-          "title": "7 \u00b7 Final Round",
+          "title": "7 · Final Round",
           "desc": "The toughest Yetzer Hara. Collect Torah lights for the mega bomb."
         }
       ],
@@ -81,12 +81,12 @@
       "levels": [
         {
           "id": "runner1",
-          "title": "1 \u00b7 Erev Shabbos Dash",
+          "title": "1 · Erev Shabbos Dash",
           "desc": "Race to shul before candle lighting. 900 m."
         },
         {
           "id": "runner2",
-          "title": "2 \u00b7 Night Chase",
+          "title": "2 · Night Chase",
           "desc": "Cars and buses. The Yetzer Hara is behind you. 1300 m."
         }
       ],
@@ -114,31 +114,40 @@
       "id": "city",
       "title": "Erev Shabbos City",
       "subtitle": "Open-world errands",
-      "desc": "Walk or drive through Geula and Machane Yehuda. Finish the Shabbos errands before candle lighting.",
+      "desc": "Drive a real family car and a motor boat through Jerusalem and Tiberias. Shop for Shabbos, load the trunk and reach shul before candle lighting.",
       "levels": [
         {
           "id": "city1",
-          "title": "1 \u00b7 Geula & Machane Yehuda",
-          "desc": "Challah, fish, flowers, grape juice, then shul. 5 minutes."
+          "title": "1 · Geula & Machane Yehuda",
+          "desc": "Challah, fish, flowers, juice. Load the trunk, then shul. 5 minutes."
+        },
+        {
+          "id": "city2",
+          "title": "2 · Tiberias & the Kinneret",
+          "desc": "Drive to the marina, sail Moshe's boat for fresh fish, then the errands. 7 minutes."
         }
       ],
       "free": true,
       "howto": [
         {
           "title": "Your goal",
-          "body": "It is Erev Shabbos in Jerusalem. Do 4 errands (challah, fish, flowers, grape juice) and reach the shul before candle lighting. The clock at the top counts down and the sky turns to sunset."
+          "body": "It is Erev Shabbos. Do the errands, carry everything home and reach the shul before candle lighting. The clock counts down and the sky turns to sunset. Level 2 is on the shore of the Kinneret in Tiberias: you even get a boat."
         },
         {
-          "title": "Controls",
-          "body": "Left thumb: joystick to walk. Drag on the right side of the screen to look around. The yellow button appears when you can buy something, get in the van or get out. In the van: joystick up is gas, down is brake and reverse, left and right steer."
+          "title": "On foot",
+          "body": "Left thumb: joystick to walk. Drag on the right side to look around; the camera turns with you. The yellow button appears when you can buy something, open the trunk, board the boat or get in the car."
         },
         {
-          "title": "Finding your way",
-          "body": "The yellow arrow at the top points to the next errand and shows the distance. The map in the corner shows the streets, the market (orange), your van (white) and the next stop (yellow dot). A yellow beam marks the shop."
+          "title": "Carrying",
+          "body": "When you buy something you hold it up, then it goes into your shopping bag. A heavy bag slows you down. Walk to the back of your car and press PUT IN TRUNK. Before you go into shul, press TAKE OUT at the trunk to get the shopping back."
+        },
+        {
+          "title": "Driving and sailing",
+          "body": "In a car or boat you get GAS and BRAKE pedals on the right. Hold brake when stopped to reverse. Steer with tilt, a slide bar, arrow buttons or a D-pad: pick your favourite in Settings > Game or in the pause menu. VIEW switches between chase, driver's seat and hood cameras. Look at the dashboard: the steering wheel really turns."
         },
         {
           "title": "Traps",
-          "body": "Bumping into people costs 1 second. Cars do not stop for you: getting hit costs 3 to 4 seconds. Chatty neighbours who stop you for a chat cost 8 seconds, so walk around them. Grab the gold shekels for bonus points."
+          "body": "Bumping into people costs 1 second. Cars do not stop for you: getting hit costs 3 to 4 seconds. Chatty neighbours cost 8 seconds, so walk around them. Grab the gold shekels for bonus points."
         }
       ]
     }
