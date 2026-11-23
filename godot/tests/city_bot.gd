@@ -37,6 +37,9 @@ func _physics_process(delta: float) -> void:
 	if scene == "vista":
 		_vista()
 		return
+	if scene == "soak":
+		_soak(get_physics_process_delta_time())
+		return
 	if scene == "drive" or scene == "sea":
 		_demo(get_physics_process_delta_time())
 		return
@@ -87,6 +90,9 @@ func _physics_process(delta: float) -> void:
 			print("van pos ", game.van.position, " speed ", game.van_speed)
 			get_tree().quit(0)
 		return
+	if not stats_done:
+		_stats()
+	_prof()
 	if game.mi >= game.missions.size():
 		return
 	if game.busy > 0.0:
@@ -316,3 +322,75 @@ func _demo(delta: float) -> void:
 				if demo_t > 0.3:
 					_snap("tiberias_aerial")
 					get_tree().quit(0)
+
+
+var stats_done := false
+
+
+func _stats() -> void:
+	stats_done = true
+	var nodes := 0
+	var meshes := 0
+	var verts := 0
+	var labels := 0
+	var lights := 0
+	var stack: Array = [game]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		nodes += 1
+		if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
+			meshes += 1
+			var mm: Mesh = (n as MeshInstance3D).mesh
+			for sidx in mm.get_surface_count():
+				var arr := mm.surface_get_arrays(sidx)
+				if arr.size() > 0 and arr[0] != null:
+					verts += (arr[0] as PackedVector3Array).size()
+		if n is Label3D:
+			labels += 1
+		if n is Light3D:
+			lights += 1
+		for c in n.get_children():
+			stack.append(c)
+	print("STATS boot_ms=%d " % Time.get_ticks_msec(), "nodes=%d meshinst=%d verts=%d label3d=%d lights=%d mem=%.0fMB" % [nodes, meshes, verts, labels, lights, OS.get_static_memory_usage() / 1048576.0])
+
+
+var prof_n := 0
+var prof_sum := 0.0
+
+
+func _prof() -> void:
+	prof_n += 1
+	prof_sum += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	if prof_n == 120:
+		print("PROF physics_ms_avg=%.2f process_ms=%.2f" % [prof_sum / prof_n, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0])
+
+
+var soak_t := 0.0
+var soak_next := 0.0
+var soak_rng := RandomNumberGenerator.new()
+
+
+func _soak(delta: float) -> void:
+	soak_t += delta
+	game.time_left = 9999.0
+	if game.phase != "play":
+		game.phase = "play" if soak_t > 0.3 else game.phase
+		return
+	var di = game.drive_ui
+	if not game.in_van and not game.in_boat:
+		game.pl.position = game.van.position + Vector3(-2.2, 0, 0)
+		game.interact()
+		di.bot_on = true
+	if soak_t > soak_next:
+		soak_next = soak_t + 1.5
+		di.bot_gas = 1.0 if soak_rng.randf() < 0.85 else 0.0
+		di.bot_brake = 0.0 if di.bot_gas > 0.5 else 1.0
+		di.bot_steer = soak_rng.randf_range(-1.0, 1.0)
+		if soak_rng.randf() < 0.1:
+			game._cycle_view()
+		if soak_rng.randf() < 0.15:
+			game.van.position = Vector3(soak_rng.randf_range(-90, 90), 0, soak_rng.randf_range(-90, 60))
+	if int(soak_t) % 20 == 0 and absf(soak_t - round(soak_t)) < delta and int(soak_t) != int(soak_t - delta):
+		print("SOAK t=%d mem=%.1fMB nodes=%d objs=%d orphan=%d" % [int(soak_t), OS.get_static_memory_usage() / 1048576.0, Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)])
+	if soak_t > 400.0:
+		get_tree().quit(0)

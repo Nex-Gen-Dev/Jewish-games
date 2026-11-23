@@ -86,8 +86,8 @@ const PRESETS := {
 }
 const FACADE_SHADER := """
 shader_type spatial;
-uniform sampler2D stone : source_color, repeat_enable, filter_linear_mipmap_anisotropic;
-uniform sampler2D overlay : source_color, repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D stone : source_color, repeat_enable, filter_linear_mipmap;
+uniform sampler2D overlay : source_color, repeat_enable, filter_linear_mipmap;
 uniform float stone_m = 3.2;
 uniform vec2 cell = vec2(16.0, 3.2);
 varying vec3 wp;
@@ -112,8 +112,8 @@ void fragment() {
 		ou = su / cell;
 	}
 	vec3 s = texture(stone, su / stone_m).rgb;
-	vec3 s2 = texture(stone, su / (stone_m * 4.7) + vec2(0.37)).rgb;
-	vec3 base = s * (0.7 + 0.6 * s2);
+	float vr = 0.85 + 0.15 * sin(su.x * 0.37) * sin(su.y * 0.29 + su.x * 0.11);
+	vec3 base = s * vr * 1.25;
 	base = mix(vec3(dot(base, vec3(0.3, 0.59, 0.11))), base, 0.62) * 1.0 * COLOR.rgb;
 	vec4 o = texture(overlay, ou);
 	float a = o.a * side;
@@ -231,6 +231,9 @@ var toast_t := 0.0
 
 
 func _ready() -> void:
+	Engine.max_physics_steps_per_frame = 2
+	if not Profile.quality_high():
+		get_viewport().msaa_3d = Viewport.MSAA_DISABLED
 	cfg = LEVELS.get(level_id, LEVELS["city1"])
 	map_id = str(cfg.get("map", "geula"))
 	kin = map_id == "kinneret"
@@ -425,7 +428,13 @@ func _sph_arr(r: float, seg: int, rings: int) -> Array:
 	return _pack_arr(v, n, ix)
 
 
+var sign_n := 0
+var dbg_tag := ""
+var dbg_cnt := {}
+
+
 func _append(st: SurfaceTool, arr: Array, xf: Transform3D, col := Color.WHITE) -> void:
+	dbg_cnt[dbg_tag] = int(dbg_cnt.get(dbg_tag, 0)) + (arr[Mesh.ARRAY_INDEX] as PackedInt32Array).size()
 	var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
 	var nrm: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
 	var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
@@ -453,7 +462,10 @@ func _commit_groups() -> void:
 		var g: Dictionary = groups[k]
 		var st: SurfaceTool = g["st"]
 		var kind: String = g["kind"]
+		st.index()
 		var mesh := st.commit()
+		if OS.get_environment("CITY_DEBUG") != "":
+			print("GROUP ", kind, " ", k, " ", (mesh.surface_get_arrays(0)[0] as PackedVector3Array).size())
 		var mi_node := MeshInstance3D.new()
 		mi_node.mesh = mesh
 		mi_node.material_override = _kind_mat(kind)
@@ -550,7 +562,7 @@ func _camera() -> void:
 		cam.keep_aspect = Camera3D.KEEP_HEIGHT
 		cam.fov = 62.0
 	base_fov = cam.fov
-	cam.far = 320.0
+	cam.far = 320.0 if Profile.quality_high() else 230.0
 	cam.near = 0.08
 
 
@@ -697,6 +709,12 @@ func _lp(o: Vector3, yaw: float, l: Vector3) -> Vector3:
 	return o + Basis(Vector3.UP, yaw) * l
 
 
+## Shop and stall signs are capped: every Label3D is its own draw call and glyph mesh.
+func _sign_ok() -> bool:
+	sign_n += 1
+	return sign_n % 3 == 0 and sign_n < 240
+
+
 func _hlabel(text: String, size: int, pos: Vector3, yaw: float, col := Color.WHITE, vis_end := 60.0) -> Label3D:
 	var lb := Label3D.new()
 	lb.text = text
@@ -704,7 +722,7 @@ func _hlabel(text: String, size: int, pos: Vector3, yaw: float, col := Color.WHI
 		lb.font = heb_font
 	lb.font_size = size
 	lb.pixel_size = 0.0085
-	lb.outline_size = 8
+	lb.outline_size = 4
 	lb.modulate = col
 	lb.outline_modulate = Color(0, 0, 0, 0.85)
 	lb.position = pos
@@ -737,16 +755,24 @@ func _build_world() -> void:
 				continue
 			var zx: Array = ZONES[ix]
 			var zz: Array = ZONES[iz]
+			dbg_tag = "zone_block"
 			_zone_block(zx[0], zx[1], zz[0], zz[1])
+	dbg_tag = "_market()"
 	_market()
+	dbg_tag = "_places()"
 	_places()
+	dbg_tag = "_street_props()"
 	_street_props()
+	dbg_tag = "_furniture()"
 	_furniture()
 	if kin:
 		_lake()
 	aux_marker = _make_marker()
 	add_child(aux_marker)
+	dbg_tag = "_hills()"
 	_hills()
+	if OS.get_environment("CITY_DEBUG") != "":
+		print("TAGS ", dbg_cnt)
 	_commit_groups()
 	solid(-HALF - 20.0, -HALF - 20.0, -HALF - 18.0, HALF + 20.0)
 	solid(HALF + 18.0, -HALF - 20.0, HALF + 20.0, HALF + 20.0)
@@ -848,10 +874,14 @@ func _lot(x0: float, x1: float, z0: float, z1: float, fixed_h := 0.0, hero := fa
 	var cz := (c + e) / 2.0
 	_append(_g("f%d" % style, Vector3(cx, 0, cz)), box_arr, Transform3D(Basis.from_scale(Vector3(b - a, h, e - c)), Vector3(cx, h / 2.0, cz)), tint)
 	solid(a, c, b, e)
+	dbg_tag = "roof"
 	_roof(a, c, b, e, h)
-	_massing(a, c, b, e, h, floors, tint)
+	dbg_tag = "lot_rest"
+	#_massing(a, c, b, e, h, floors, tint)
 	var edges := _edges(a, c, b, e, market_side)
+	dbg_tag = "shop"
 	_shopfronts(edges, a, c, b, e, hero, market_side != "")
+	dbg_tag = "balc"
 	if hero:
 		_balconies(edges, a, c, b, e, floors, style)
 	if is_shul:
@@ -906,7 +936,10 @@ func _roof(a: float, c: float, b: float, e: float, h: float) -> void:
 	for k in nprops:
 		var px := cx + rng.randf_range(-(b - a) / 3.0, (b - a) / 3.0)
 		var pz := cz + rng.randf_range(-(e - c) / 3.0, (e - c) / 3.0)
-		match rng.randi() % 4:
+		var pkind := rng.randi() % 4
+		if k > 0:
+			continue
+		match pkind:
 			0:
 				for lx in [-0.45, 0.45]:
 					for lz in [-0.45, 0.45]:
@@ -991,14 +1024,15 @@ func _storefront(o: Vector3, yaw: float, w: float, hero: bool, arch: bool) -> vo
 	if arch:
 		sbox(Color("#d9cdb0"), _lp(o, yaw, Vector3(0, 1.5, 0.07)), Vector3(w - 0.5, 3.0, 0.1), yaw)
 		sbox(dark, _lp(o, yaw, Vector3(0, 1.0, 0.14)), Vector3(2.8, 2.0, 0.1), yaw)
-		scyl(dark, _lp(o, yaw, Vector3(0, 2.0, 0.14)), 1.4, 1.4, 0.1, 16, 0.0, rot)
+		scyl(dark, _lp(o, yaw, Vector3(0, 2.0, 0.14)), 1.4, 1.4, 0.1, 10, 0.0, rot)
 		sbox(gc, _lp(o, yaw, Vector3(0, 0.95, 0.2)), Vector3(2.5, 1.9, 0.04), yaw, 0.45)
-		scyl(gc, _lp(o, yaw, Vector3(0, 1.9, 0.2)), 1.25, 1.25, 0.04, 16, 0.45, rot)
+		scyl(gc, _lp(o, yaw, Vector3(0, 1.9, 0.2)), 1.25, 1.25, 0.04, 10, 0.45, rot)
 		sbox(Color("#8a6a44"), _lp(o, yaw, Vector3(0, 0.45, 0.55)), Vector3(2.6, 0.9, 0.8), yaw)
 		if hero:
 			var tx: String = HEB_SHOPS[rng.randi() % HEB_SHOPS.size()]
 			sbox(Color("#1e1a16"), _lp(o, yaw, Vector3(0, 3.7, 0.12)), Vector3(w - 0.8, 0.6, 0.12), yaw)
-			_hlabel(tx, 64, _lp(o, yaw, Vector3(0, 3.7, 0.2)), yaw, Color("#ffe9b0"), 40.0)
+			if _sign_ok():
+				_hlabel(tx, 64, _lp(o, yaw, Vector3(0, 3.7, 0.2)), yaw, Color("#ffe9b0"), 30.0)
 		return
 	sbox(dark, _lp(o, yaw, Vector3(0, 1.4, 0.1)), Vector3(w - 0.6, 2.8, 0.2), yaw)
 	sbox(gc, _lp(o, yaw, Vector3(0, 1.3, 0.22)), Vector3(w - 1.2, 2.1, 0.05), yaw, 0.3)
@@ -1014,7 +1048,8 @@ func _storefront(o: Vector3, yaw: float, w: float, hero: bool, arch: bool) -> vo
 		sbox(Color("#8a8070"), _lp(o, yaw, Vector3(0, 0.25, 0.22)), Vector3(w - 0.6, 0.5, 0.16), yaw)
 		sbox(Color("#1e1a16"), _lp(o, yaw, Vector3(0, 3.65, 0.1)), Vector3(w - 0.6, 0.6, 0.12), yaw)
 		var tx2: String = HEB_SHOPS[rng.randi() % HEB_SHOPS.size()]
-		_hlabel(tx2, 64, _lp(o, yaw, Vector3(0, 3.65, 0.18)), yaw, Color("#ffe9b0"), 40.0)
+		if _sign_ok():
+			_hlabel(tx2, 64, _lp(o, yaw, Vector3(0, 3.65, 0.18)), yaw, Color("#ffe9b0"), 30.0)
 
 
 func _balconies(edges: Array, a: float, c: float, b: float, e: float, floors: int, style: int) -> void:
@@ -1047,8 +1082,7 @@ func _balconies(edges: Array, a: float, c: float, b: float, e: float, floors: in
 				for sx in [-1.42, 1.42]:
 					sbox(iron, _lp(o, yaw, Vector3(sx, y + 1.0, 0.5)), Vector3(0.05, 0.05, 1.0), yaw)
 					sbox(iron, _lp(o, yaw, Vector3(sx, y + 0.55, 0.98)), Vector3(0.05, 0.9, 0.05), yaw)
-				for i in 5:
-					sbox(iron, _lp(o, yaw, Vector3(-1.2 + 0.6 * i, y + 0.55, 0.98)), Vector3(0.03, 0.85, 0.03), yaw)
+				sbox(iron, _lp(o, yaw, Vector3(0, y + 0.5, 0.98)), Vector3(2.8, 0.7, 0.03), yaw)
 
 
 func _market() -> void:
@@ -1109,7 +1143,8 @@ func _market() -> void:
 			for i in 2:
 				sbox(crate, Vector3(cx - dirn * 0.4, 1.0 + i * 0.3, z + 1.2 * (1 - 2 * i)), Vector3(0.7, 0.28, 0.9), 0.2 * i)
 			sbox(Color("#241c14"), Vector3(cx - dirn * 0.72, 3.95, z), Vector3(0.1, 0.7, 3.4))
-			_hlabel(heb, 72, Vector3(cx - dirn * 0.72 + dirn * 0.08, 3.95, z), dirn * PI / 2.0, Color("#ffe9b0"), 45.0)
+			if k % 2 == 0:
+				_hlabel(heb, 72, Vector3(cx - dirn * 0.72 + dirn * 0.08, 3.95, z), dirn * PI / 2.0, Color("#ffe9b0"), 36.0)
 			solid(cx - 1.75, z - 2.1, cx + 1.75, z + 2.1)
 	# glass and steel canopy
 	var hw := 6.4
