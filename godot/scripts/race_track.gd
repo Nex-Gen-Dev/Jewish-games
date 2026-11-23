@@ -743,8 +743,10 @@ func build(parent: Node3D, high: bool) -> void:
 	for i in segs:
 		_segment(i)
 	_scenery(high)
+	var total_v := 0
 	for key in _chunks.keys():
 		var mbk: MB = _chunks[key]
+		total_v += mbk.v.size()
 		var is_w: bool = (key % 2) == 1
 		var am := mbk.mesh(_mat_water if is_w else _mat_solid)
 		if am == null:
@@ -752,8 +754,9 @@ func build(parent: Node3D, high: bool) -> void:
 		var mi := MeshInstance3D.new()
 		mi.mesh = am
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.visibility_range_end = 520.0
+		mi.visibility_range_end = 470.0
 		parent.add_child(mi)
+	print("race_track: vertices=%d chunks=%d" % [total_v, _chunks.size()])
 	# the ground, far below
 	var gm := MB.new()
 	var cx := (min_xz.x + max_xz.x) * 0.5

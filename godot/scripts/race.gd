@@ -74,6 +74,7 @@ var last_cd := -1
 
 
 func _ready() -> void:
+	Engine.max_physics_steps_per_frame = 2 ## slow phones: run slower instead of piling up steps
 	cfg = LEVELS.get(level_id, LEVELS["race1"])
 	rng.seed = 2026
 	_environment()
@@ -156,7 +157,7 @@ func _camera() -> void:
 	if cam == null:
 		cam = Camera3D.new()
 		cam.current = true
-		cam.far = 620.0
+		cam.far = 540.0
 		cam.near = 0.1
 		add_child(cam)
 	var vs := get_viewport().get_visible_rect().size
