@@ -150,6 +150,57 @@
           "body": "Bumping into people costs 1 second. Cars do not stop for you: getting hit costs 3 to 4 seconds. Chatty neighbours cost 8 seconds, so walk around them. Grab the gold shekels for bonus points."
         }
       ]
+    },
+    {
+      "id": "race",
+      "title": "Shtick Racing",
+      "subtitle": "Boat and car races",
+      "desc": "Race against the Yetzer Hara and his gang in boats and cars. Cliffs, dams, jumps and rapids, with a big steering wheel, gas, brake and a real gear shifter.",
+      "levels": [
+        {
+          "id": "race1",
+          "title": "1 · Kinneret Cup",
+          "desc": "Boat race from Tiberias down the Jordan: rapids, a broken bridge and two dams. About 2 minutes."
+        },
+        {
+          "id": "race2",
+          "title": "2 · Geula Grand Prix",
+          "desc": "Car race, three laps through the streets and over a little bridge. About 2.5 minutes."
+        },
+        {
+          "id": "race3",
+          "title": "3 · Judean Hills Rally",
+          "desc": "Up the mountain, across a dam, down again. Hairpins and jumps. About 2 minutes."
+        },
+        {
+          "id": "race4",
+          "title": "4 · Jordan Canyon Marathon",
+          "desc": "The long boat race: four dams, four jumps and boost pads. About 5 minutes."
+        }
+      ],
+      "free": true,
+      "howto": [
+        {
+          "title": "Your goal",
+          "body": "Race five computer drivers. Finish in the top 3 to unlock the next race. Win to earn the most points. The Yetzer Hara is the fastest, so do not let him win."
+        },
+        {
+          "title": "Steering",
+          "body": "Put your left thumb on the big steering wheel and turn it, like a real wheel. It springs back to the middle when you let go. You can change to arrow buttons or tilt in Options or in the pause menu."
+        },
+        {
+          "title": "Gas, brake and gears",
+          "body": "Right thumb: GAS to go, BRAKE to slow down. The shifter has D (drive), N (neutral) and R (reverse). To back up, stop, slide the shifter down to R and press GAS. Tap AUTO to switch to MANUAL and pick gears 1 to 5 yourself: low gears pull hard, high gears are fast."
+        },
+        {
+          "title": "Jumps, dams and boost",
+          "body": "Hit the yellow ramps fast to fly over the broken bridge. Yellow arrows on the road or water are boost pads. Boats slide on turns, so ease off the gas before a bend. If you fall off or get stuck, you are put back on the track by itself, or use Back on track in the pause menu."
+        },
+        {
+          "title": "Camera and map",
+          "body": "VIEW switches between behind, high and the driver's seat. The map in the corner shows the whole course and where every racer is."
+        }
+      ]
     }
   ],
   "shop": [

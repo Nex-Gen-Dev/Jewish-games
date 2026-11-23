@@ -92,6 +92,22 @@ func _ready() -> void:
 	for i in 60:
 		await get_tree().process_frame
 	await _snap(out + "/hub_runner.png")
+	l.call("_close_hub")
+	for gi in P.manifest["games"].size():
+		if str(P.manifest["games"][gi]["id"]) != "race":
+			continue
+		l.call("_open_hub", P.manifest["games"][gi])
+		l.set("hub_tab", "levels")
+		l.call("_hub_render")
+		for i in 60:
+			await get_tree().process_frame
+		await _snap(out + "/hub_race.png")
+		l.set("hub_tab", "options")
+		l.call("_hub_render")
+		for i in 20:
+			await get_tree().process_frame
+		await _snap(out + "/hub_race_options.png")
+		l.call("_close_hub")
 	# nested taps: card body opens the game page, the Play button inside it starts the level
 	l.call("_close_hub")
 	l.call("_show", "play")

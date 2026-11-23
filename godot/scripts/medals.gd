@@ -43,6 +43,8 @@ static func value(stat: String) -> int:
 			return _levels_done("runner")
 		"city_levels":
 			return _levels_done("city")
+		"race_levels":
+			return _levels_done("race")
 	return Profile.stat(stat)
 
 

@@ -325,6 +325,115 @@
      }
     }
    ]
+  },
+  {
+   "id": "rwins",
+   "game": "race",
+   "name": "Race Winner",
+   "desc": "Win races (finish first).",
+   "stat": "race_wins",
+   "tiers": [
+    {
+     "goal": 1,
+     "reward": {
+      "coins": 80
+     }
+    },
+    {
+     "goal": 5,
+     "reward": {
+      "coins": 200
+     }
+    },
+    {
+     "goal": 15,
+     "reward": {
+      "coins": 500,
+      "title": "Racing Champ"
+     }
+    }
+   ]
+  },
+  {
+   "id": "rair",
+   "game": "race",
+   "name": "Big Air",
+   "desc": "Fly over jumps and dams.",
+   "stat": "race_jumps",
+   "tiers": [
+    {
+     "goal": 5,
+     "reward": {
+      "coins": 60
+     }
+    },
+    {
+     "goal": 25,
+     "reward": {
+      "coins": 150
+     }
+    },
+    {
+     "goal": 80,
+     "reward": {
+      "coins": 350
+     }
+    }
+   ]
+  },
+  {
+   "id": "rfinish",
+   "game": "race",
+   "name": "Pit Crew",
+   "desc": "Finish races.",
+   "stat": "race_finishes",
+   "tiers": [
+    {
+     "goal": 3,
+     "reward": {
+      "coins": 50
+     }
+    },
+    {
+     "goal": 10,
+     "reward": {
+      "coins": 150
+     }
+    },
+    {
+     "goal": 30,
+     "reward": {
+      "coins": 300
+     }
+    }
+   ]
+  },
+  {
+   "id": "rchamp2",
+   "game": "race",
+   "name": "Racing Legend",
+   "desc": "Finish the top 3 in every racing level.",
+   "stat": "race_levels",
+   "tiers": [
+    {
+     "goal": 1,
+     "reward": {
+      "coins": 100
+     }
+    },
+    {
+     "goal": 2,
+     "reward": {
+      "coins": 250
+     }
+    },
+    {
+     "goal": 4,
+     "reward": {
+      "coins": 600
+     }
+    }
+   ]
   }
  ]
 }

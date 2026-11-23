@@ -5,6 +5,7 @@ const AppLog := preload("res://scripts/applog.gd")
 const CloudScript := preload("res://scripts/cloud.gd")
 const RunnerScript := preload("res://scripts/runner.gd")
 const CityScript := preload("res://scripts/city.gd")
+const RaceScript := preload("res://scripts/race.gd")
 
 var current: Node
 var selftest_level := ""
@@ -82,13 +83,22 @@ func start_level(level_id: String) -> void:
 		g = RunnerScript.new()
 	elif level_id.begins_with("city"):
 		g = CityScript.new()
+	elif level_id.begins_with("race"):
+		g = RaceScript.new()
 	else:
 		g = Game.new()
 	g.level_id = level_id
 	g.app = self
 	_swap(g)
 	if selftest_level != "":
-		var bot_script: GDScript = load("res://tests/runner_bot.gd" if level_id.begins_with("runner") else ("res://tests/city_bot.gd" if level_id.begins_with("city") else "res://tests/bot.gd"))
+		var bot_path := "res://tests/bot.gd"
+		if level_id.begins_with("runner"):
+			bot_path = "res://tests/runner_bot.gd"
+		elif level_id.begins_with("city"):
+			bot_path = "res://tests/city_bot.gd"
+		elif level_id.begins_with("race"):
+			bot_path = "res://tests/race_bot.gd"
+		var bot_script: GDScript = load(bot_path)
 		var bot: Node = bot_script.new()
 		bot.game = g
 		add_child(bot)
