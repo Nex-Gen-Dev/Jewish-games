@@ -17,6 +17,7 @@ static var last_status := ""
 static var ready_to_restart := false
 static var checked_this_session := false
 static var boot_content := 0 ## content version that is actually running
+static var beta_feed := false ## true when the update came from the tester feed
 
 
 ## Close the app and open it again by itself so a downloaded update is used.
@@ -79,23 +80,16 @@ func run(base_override := "") -> void:
 	if base_override.begins_with("http://127.0.0.1") or base_override.begins_with("http://localhost"):
 		base_url = base_override
 	_say("Checking for updates...")
-	var req := HTTPRequest.new()
-	req.timeout = 20.0
-	add_child(req)
-	var err := req.request(base_url + "/version.json?t=" + str(int(Time.get_unix_time_from_system())))
-	if err != OK:
-		push_warning("req err %d" % err)
-		req.queue_free()
-		_say("The update address doesn't look right.")
-		return
-	var res: Array = await req.request_completed
-	req.queue_free()
-	if res[0] != HTTPRequest.RESULT_SUCCESS or res[1] != 200:
-		_say("Couldn't reach the update server (code %d)." % res[1])
-		return
-	var info: Variant = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
-	if not info is Dictionary:
-		_say("The update information was not readable.")
+	var stamp := "?t=" + str(int(Time.get_unix_time_from_system()))
+	var info: Dictionary = await _fetch_info(base_url + "/version.json" + stamp)
+	## Testers (their private settings have "beta": true) also look at the beta feed and
+	## take whichever has the newer content. Everyone else never reads beta.json.
+	if bool(Profile.data.get("beta", false)):
+		var binfo: Dictionary = await _fetch_info(base_url + "/beta.json" + stamp)
+		if int(binfo.get("content", 0)) > int(info.get("content", 0)):
+			info = binfo
+			beta_feed = true
+	if info.is_empty():
 		return
 	_remember_api(info)
 	var content := int(info.get("content", 0))
@@ -133,10 +127,34 @@ func run(base_override := "") -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(final))
 	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(final))
 	var f := FileAccess.open(DIR + "/meta.json", FileAccess.WRITE)
-	f.store_string(JSON.stringify({"content": content, "notes": str(info.get("notes", "")), "api_url": str(read_meta().get("api_url", ""))}))
+	f.store_string(JSON.stringify({"content": content, "notes": str(info.get("notes", "")), "api_url": str(read_meta().get("api_url", "")), "beta": beta_feed}))
 	f.close()
 	ready_to_restart = true
-	_say("Update v%d installed. Tap Restart to use it." % content)
+	_say(("Beta update v%d installed. Tap Restart to use it." if beta_feed else "Update v%d installed. Tap Restart to use it.") % content)
+
+
+## Fetch and parse one feed file. Returns {} when it cannot be read (and says why).
+func _fetch_info(url: String) -> Dictionary:
+	var req := HTTPRequest.new()
+	req.timeout = 20.0
+	add_child(req)
+	if req.request(url) != OK:
+		req.queue_free()
+		if "beta.json" not in url:
+			_say("The update address doesn't look right.")
+		return {}
+	var res: Array = await req.request_completed
+	req.queue_free()
+	if res[0] != HTTPRequest.RESULT_SUCCESS or res[1] != 200:
+		if "beta.json" not in url:
+			_say("Couldn't reach the update server (code %d)." % res[1])
+		return {}
+	var info: Variant = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
+	if not info is Dictionary:
+		if "beta.json" not in url:
+			_say("The update information was not readable.")
+		return {}
+	return info
 
 
 ## The feed can announce the backend address ("api_url"), so the server can be
