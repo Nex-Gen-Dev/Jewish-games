@@ -167,7 +167,7 @@ func sync_progress() -> void:
 	var body := {
 		"completed": prog.get("completed", []), "points": Profile.points(),
 		"inventory": Profile.data.get("inventory", []), "last_level": last_level,
-		"app_version": "1.2", "content_version": Updater.boot_content,
+		"app_version": "1.4", "content_version": Updater.boot_content,
 	}
 	await _req("/v1/me/sync", HTTPClient.METHOD_POST, body)
 
@@ -176,7 +176,7 @@ func sync_progress() -> void:
 func send_report(kind: String, message: String, include_logs := true) -> void:
 	var rep := {
 		"kind": kind, "message": message, "level": AppLog.level if AppLog.level != "" else last_level,
-		"device": "%s %s" % [OS.get_name(), OS.get_model_name()], "app_version": "1.2",
+		"device": "%s %s" % [OS.get_name(), OS.get_model_name()], "app_version": "1.4",
 		"content_version": Updater.boot_content,
 		"logs": AppLog.dump() if include_logs else "",
 	}
