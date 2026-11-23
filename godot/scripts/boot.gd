@@ -4,7 +4,7 @@ extends Node
 ## If the app fails to start 3 times in a row with an update, the update is
 ## thrown away and the bundled version is used instead.
 
-const BASE_CONTENT := 5
+const BASE_CONTENT := 11 ## must equal the content bundled in the newest APK (else a stale cached pack overrides the APK)
 const DIR := "user://update"
 
 
