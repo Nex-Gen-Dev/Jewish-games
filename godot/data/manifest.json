@@ -8,37 +8,37 @@
       "levels": [
         {
           "id": "bedroom",
-          "title": "1 · Out of Bed",
+          "title": "1 \u00b7 Out of Bed",
           "desc": "Beat the Yetzer Hara before he wins the snooze battle."
         },
         {
           "id": "street",
-          "title": "2 · Shul on Time",
+          "title": "2 \u00b7 Shul on Time",
           "desc": "Run the street, smash the alarm clock, reach shul before davening starts."
         },
         {
           "id": "shul",
-          "title": "3 · Davening in Shul",
+          "title": "3 \u00b7 Davening in Shul",
           "desc": "Put on tefillin, find your seat, stay quiet. No fighting here."
         },
         {
           "id": "market",
-          "title": "4 · Night Market",
+          "title": "4 \u00b7 Night Market",
           "desc": "Knife and rifle imps. Buy a blaster!"
         },
         {
           "id": "seder",
-          "title": "5 · Seder Night",
+          "title": "5 \u00b7 Seder Night",
           "desc": "Boss fight at the Seder table. Find the Matzahs for a mega bomb."
         },
         {
           "id": "purim",
-          "title": "6 · Purim Street",
+          "title": "6 \u00b7 Purim Street",
           "desc": "A long, crowded street. Reach the Purim Seudah in time."
         },
         {
           "id": "finale",
-          "title": "7 · Final Round",
+          "title": "7 \u00b7 Final Round",
           "desc": "The toughest Yetzer Hara. Collect Torah lights for the mega bomb."
         }
       ],
@@ -81,12 +81,12 @@
       "levels": [
         {
           "id": "runner1",
-          "title": "1 · Erev Shabbos Dash",
+          "title": "1 \u00b7 Erev Shabbos Dash",
           "desc": "Race to shul before candle lighting. 900 m."
         },
         {
           "id": "runner2",
-          "title": "2 · Night Chase",
+          "title": "2 \u00b7 Night Chase",
           "desc": "Cars and buses. The Yetzer Hara is behind you. 1300 m."
         }
       ],
@@ -118,7 +118,7 @@
       "levels": [
         {
           "id": "city1",
-          "title": "1 · Geula & Machane Yehuda",
+          "title": "1 \u00b7 Geula & Machane Yehuda",
           "desc": "Challah, fish, flowers, grape juice, then shul. 5 minutes."
         }
       ],
@@ -156,6 +156,55 @@
       "desc": "Blaster fires twice as fast.",
       "cost": 400,
       "requires": "blaster"
+    },
+    {
+      "id": "iron_gloves",
+      "name": "Iron Gloves",
+      "desc": "Fighter: punches and kicks hit 30% harder.",
+      "cost": 0,
+      "medal": "brawler"
+    },
+    {
+      "id": "golden_blaster",
+      "name": "Golden Blaster",
+      "desc": "Fighter: blaster shots do almost twice the damage.",
+      "cost": 0,
+      "medal": "combo"
+    },
+    {
+      "id": "armor",
+      "name": "Tzitzis Armor",
+      "desc": "Fighter: +30 health.",
+      "cost": 0,
+      "medal": "boss"
+    },
+    {
+      "id": "coin_magnet",
+      "name": "Coin Magnet",
+      "desc": "Runner: grab coins from twice as far.",
+      "cost": 0,
+      "medal": "grabber"
+    },
+    {
+      "id": "extra_heart",
+      "name": "Extra Heart",
+      "desc": "Runner: start with 4 lives.",
+      "cost": 0,
+      "medal": "longhaul"
+    },
+    {
+      "id": "stopwatch",
+      "name": "Stopwatch",
+      "desc": "City: +45 seconds on the clock.",
+      "cost": 0,
+      "medal": "errands"
+    },
+    {
+      "id": "turbo_van",
+      "name": "Turbo Van",
+      "desc": "City: the van goes faster.",
+      "cost": 0,
+      "medal": "speedy"
     }
   ],
   "tour": [

@@ -356,8 +356,8 @@ func _start_arena(boss_kind: String, task: String) -> void:
 		var imp := _spawn_enemy(adds[i], Vector3(-7 + i * (14.0 / maxf(adds.size() - 1, 1)), 0, 2))
 		imp.aggro = 99.0
 		imp.appear()
-	player.max_health = 160.0
-	player.health = 160.0
+	player.max_health += 40.0
+	player.health = player.max_health
 	hud.set_player_health(player.health, player.max_health)
 	var lbl := "TORAH LIGHT" if boss_kind == "overlord" else "MATZAH"
 	for p: Vector3 in info.get("pickups", []):
@@ -589,6 +589,10 @@ func _award_kill(e: Enemy) -> void:
 	combo = combo + 1 if combo_t > 0.0 else 1
 	combo_t = 8.0
 	var base := 100 if e.is_boss else 10
+	Profile.stat_add("kills")
+	if e.is_boss:
+		Profile.stat_add("bosses")
+	Profile.stat_max("best_combo", combo)
 	var mult := mini(combo, 5)
 	run_points += base * mult
 	_update_score_label()

@@ -343,7 +343,9 @@ func _spacer() -> Control:
 	return s
 
 
-const TABS := [["play", "Games", "pad"], ["shop", "Shop", "shop"], ["settings", "Settings", "gear"]]
+const Medals := preload("res://scripts/medals.gd")
+var _medal_toasted := false
+const TABS := [["play", "Games", "pad"], ["medals", "Medals", "medal"], ["shop", "Shop", "shop"], ["settings", "Settings", "gear"]]
 
 
 func _bottom_nav() -> Control:
@@ -431,17 +433,22 @@ func _show(which: String) -> void:
 			nb.border_width_left = 3
 			nb.border_color = accent
 		(it["panel"] as PanelContainer).add_theme_stylebox_override("panel", nb)
-	title_label.text = {"play": "SHTICK GAMES", "shop": "SHOP", "settings": "SETTINGS"}.get(which, "")
+	title_label.text = {"play": "SHTICK GAMES", "medals": "MEDALS", "shop": "SHOP", "settings": "SETTINGS"}.get(which, "")
 	for c in content.get_children():
 		content.remove_child(c)
 		c.queue_free()
 	match which:
+		"medals":
+			_build_medals()
 		"shop":
 			_build_shop()
 		"settings":
 			_build_settings()
 		_:
 			_build_play()
+			if not _medal_toasted and Medals.total_claimable() > 0:
+				_medal_toasted = true
+				_toast("New medal ready!", "Open the Medals tab to claim your reward.")
 	scroll.scroll_vertical = 0
 	_animate_in(content)
 
@@ -827,8 +834,8 @@ func _update_banner() -> void:
 		_button(v, "Restart now", func(): Updater.restart_app())
 	elif apk_url != "":
 		var v2 := _card(content, Color(GOLD, 0.7), Color(GOLD, 0.1), 14)
-		_title(v2, "New app version", 22, GOLD, true)
-		_label(v2, "Tap Download, then open the file when it finishes and tap Install. When Android says it's done, tap Open.", 14, TEXT)
+		_title(v2, "New app version: new icon + Medals", 22, GOLD, true)
+		_label(v2, "Tap Download, open the file when it finishes, tap Install (Android may ask you to allow installs from this app once). Then tap Open. Your home-screen icon changes after this.", 14, TEXT)
 		_button(v2, "Download new version", func(): OS.shell_open(apk_url))
 
 
@@ -938,7 +945,7 @@ func _clean_title(lv: Dictionary) -> String:
 # The page of one game: big preview, Play/Continue, then Levels / How to play /
 # Options. It sits on top of the launcher like a small app of its own.
 
-const HUB_TABS := [["levels", "Levels"], ["howto", "How to play"], ["options", "Options"]]
+const HUB_TABS := [["levels", "Levels"], ["medals", "Medals"], ["howto", "How to play"], ["options", "Options"]]
 
 
 func _open_hub(game: Dictionary) -> void:
@@ -1170,6 +1177,8 @@ func _hub_render() -> void:
 		hub_body.remove_child(c)
 		c.queue_free()
 	match hub_tab:
+		"medals":
+			_medals_list(hub_body, str(hub_game["id"]))
 		"howto":
 			_hub_howto(hub_body, hub_game)
 		"options":
@@ -1304,6 +1313,66 @@ func _hub_options(parent: Control, game: Dictionary) -> void:
 	_button(c, "Show the how-to-play pop-up again", func(): _howto(game), false)
 
 
+# ---------------------------------------------------------------- medals tab
+
+func _build_medals() -> void:
+	var tip := _card(content, Color(GOLD, 0.5), Color(GOLD, 0.1), 12)
+	var ttl := str(Profile.data.get("title", ""))
+	_label(tip, "Play to earn medals. Each one has bronze, silver and gold. Claim them for coins, weapons and gear." + (("\nYour title: " + ttl) if ttl != "" else ""), 13, TEXT)
+	for g in Profile.manifest.get("games", []):
+		if g.get("coming_soon", false):
+			continue
+		_section(content, str(g.get("title", g["id"])))
+		_medals_list(content, str(g["id"]))
+	_section(content, "All games")
+	_medals_list(content, "all")
+
+
+func _medals_list(parent: Control, game_id: String) -> void:
+	var grid := GridContainer.new()
+	grid.columns = 2 if wide else 1
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	grid.mouse_filter = Control.MOUSE_FILTER_PASS
+	parent.add_child(grid)
+	for m in Medals.all(game_id):
+		_medal_card(grid, m)
+
+
+func _medal_card(parent: Control, m: Dictionary) -> void:
+	var got := Profile.medal_tiers_claimed(str(m["id"]))
+	var reached := Medals.reached(m)
+	var tiers: Array = m["tiers"]
+	var v := Medals.value(str(m["stat"]))
+	var ready := Medals.claimable(m) > 0
+	var c := _card(parent, Color(GOLD, 0.8) if ready else LINE, SURF, 14)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 6)
+	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(hb)
+	var nm := _label(hb, str(m["name"]), 18, Color.WHITE)
+	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for i in tiers.size():
+		hb.add_child(Icon.new().setup("medal", Medals.TIER_COLORS[i] if i < reached else FAINT, 20))
+	_label(c, str(m["desc"]), 13, DIM)
+	var nxt := mini(reached, tiers.size() - 1)
+	var goal := int(tiers[nxt]["goal"])
+	_bar(c, clampf(float(v) / float(goal), 0.0, 1.0), Medals.TIER_COLORS[nxt])
+	if reached >= tiers.size() and got >= tiers.size():
+		_label(c, "Gold complete! %d" % v, 13, GOOD, false)
+		return
+	_label(c, "%s: %d / %d    Reward: %s" % [Medals.TIER_NAMES[nxt], mini(v, goal), goal, Medals.reward_text(tiers[nxt]["reward"])], 13, DIM)
+	if ready:
+		var next_reward: Dictionary = tiers[got]["reward"]
+		_button(c, "Claim " + Medals.reward_text(next_reward), func():
+			var r := Medals.claim(m)
+			_toast("Medal claimed!", Medals.reward_text(r))
+			if tab == "play":
+				_hub_render()
+			else:
+				_show(tab), true, true)
+
+
 # ---------------------------------------------------------------- shop tab
 
 func _build_shop() -> void:
@@ -1323,8 +1392,13 @@ func _build_shop() -> void:
 		v.add_child(hb)
 		var nm := _label(hb, str(item["name"]), 18, Color.WHITE)
 		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hb.add_child(Icon.new().setup("coin", GOLD, 16))
-		_label(hb, str(item["cost"]), 16, GOLD, false)
+		var medal_item: bool = item.has("medal")
+		if medal_item:
+			hb.add_child(Icon.new().setup("medal", GOLD, 16))
+			_label(hb, "MEDAL", 14, GOLD, false)
+		else:
+			hb.add_child(Icon.new().setup("coin", GOLD, 16))
+			_label(hb, str(item["cost"]), 16, GOLD, false)
 		_label(v, str(item["desc"]), 13, DIM)
 		var owned := Profile.owns(item["id"])
 		var req: String = item.get("requires", "")
@@ -1332,6 +1406,13 @@ func _build_shop() -> void:
 		var cost: int = item["cost"]
 		var affordable := Profile.points() >= cost
 		var label := "Owned"
+		if not owned and medal_item:
+			var mname := str(item["medal"])
+			for mm in Medals.all():
+				if mm["id"] == item["medal"]:
+					mname = str(mm["name"])
+			_button(v, "Earn the %s medal to unlock" % mname, func(): pass, false, false)
+			continue
 		if not owned:
 			label = ("Needs %s first" % req) if blocked else ("Buy" if affordable else "Need %d more points" % (cost - Profile.points()))
 		var can := not owned and not blocked and affordable

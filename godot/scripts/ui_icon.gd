@@ -76,6 +76,11 @@ func _draw() -> void:
 			draw_rect(Rect2(c + Vector2(-r * .5, -r * .32), Vector2(r * .1, r * .34)), hole, true)
 			draw_circle(c + Vector2(r * .45, -r * .12), r * .08, hole)
 			draw_circle(c + Vector2(r * .68, -r * .12), r * .08, hole)
+		"medal":
+			draw_colored_polygon(PackedVector2Array([c + Vector2(-r * .55, -r * .95), c + Vector2(-r * .1, -r * .95), c + Vector2(r * .15, -r * .1), c + Vector2(-r * .3, -r * .1)]), color)
+			draw_colored_polygon(PackedVector2Array([c + Vector2(r * .55, -r * .95), c + Vector2(r * .1, -r * .95), c + Vector2(-r * .15, -r * .1), c + Vector2(r * .3, -r * .1)]), color)
+			draw_circle(c + Vector2(0, r * .4), r * .55, color)
+			draw_circle(c + Vector2(0, r * .4), r * .25, Color(0, 0, 0, .35))
 		"help":
 			draw_arc(c + Vector2(0, -r * .2), r * .45, PI * 1.05, TAU + PI * .35, 16, color, maxf(r * .2, 2.0), true)
 			draw_circle(c + Vector2(0, r * .8), r * .13, color)

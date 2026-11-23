@@ -66,7 +66,45 @@ func points() -> int:
 
 
 func add_points(n: int) -> void:
+	if n > 0:
+		stat_add("coins_earned", n)
 	apply_update({"progress": {"points": points() + n}})
+
+
+# ---- medal stats (see data/medals.json). Games call stat_add / stat_max with
+# any key they like, then a medal can use that key as its "stat".
+
+func stat(key: String) -> int:
+	return int(data.get("stats", {}).get(key, 0))
+
+
+func stat_add(key: String, n := 1) -> void:
+	apply_update({"stats": {key: stat(key) + n}})
+
+
+func stat_max(key: String, v: int) -> void:
+	if v > stat(key):
+		apply_update({"stats": {key: v}})
+
+
+func medal_tiers_claimed(id: String) -> int:
+	return int(data.get("medals", {}).get(id, 0))
+
+
+func set_medal_claimed(id: String, n: int) -> void:
+	apply_update({"medals": {id: n}})
+
+
+## Hand out a medal reward: {"coins": n}, {"item": "id"} and/or {"title": "text"}.
+func grant(reward: Dictionary) -> void:
+	if reward.has("coins"):
+		add_points(int(reward["coins"]))
+	if reward.has("item") and not owns(str(reward["item"])):
+		var inv: Array = data.get("inventory", []).duplicate()
+		inv.append(str(reward["item"]))
+		apply_update({"inventory": inv})
+	if reward.has("title"):
+		apply_update({"title": str(reward["title"])})
 
 
 func owns(item: String) -> bool:
@@ -133,6 +171,7 @@ func mark_completed(level_id: String) -> void:
 	if level_id not in done:
 		done.append(level_id)
 		apply_update({"progress": {"completed": done}})
+	stat_add("wins")
 
 
 ## A level is playable if the user owns the game, it isn't "coming soon", and

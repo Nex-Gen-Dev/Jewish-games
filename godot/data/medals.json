@@ -1,0 +1,330 @@
+{
+ "medals": [
+  {
+   "id": "finisher",
+   "game": "all",
+   "name": "Finisher",
+   "desc": "Finish levels in any game.",
+   "stat": "levels_done",
+   "tiers": [
+    {
+     "goal": 1,
+     "reward": {
+      "coins": 50
+     }
+    },
+    {
+     "goal": 4,
+     "reward": {
+      "coins": 150
+     }
+    },
+    {
+     "goal": 8,
+     "reward": {
+      "coins": 400,
+      "title": "Shtick Legend"
+     }
+    }
+   ]
+  },
+  {
+   "id": "rich",
+   "game": "all",
+   "name": "Big Earner",
+   "desc": "Earn coins across all games.",
+   "stat": "coins_earned",
+   "tiers": [
+    {
+     "goal": 300,
+     "reward": {
+      "coins": 50
+     }
+    },
+    {
+     "goal": 1500,
+     "reward": {
+      "coins": 150
+     }
+    },
+    {
+     "goal": 5000,
+     "reward": {
+      "coins": 500,
+      "title": "Tycoon"
+     }
+    }
+   ]
+  },
+  {
+   "id": "brawler",
+   "game": "fighter",
+   "name": "Brawler",
+   "desc": "Defeat enemies.",
+   "stat": "kills",
+   "tiers": [
+    {
+     "goal": 10,
+     "reward": {
+      "coins": 40
+     }
+    },
+    {
+     "goal": 50,
+     "reward": {
+      "item": "iron_gloves"
+     }
+    },
+    {
+     "goal": 200,
+     "reward": {
+      "coins": 250,
+      "title": "Brawler"
+     }
+    }
+   ]
+  },
+  {
+   "id": "combo",
+   "game": "fighter",
+   "name": "Combo King",
+   "desc": "Reach a big combo.",
+   "stat": "best_combo",
+   "tiers": [
+    {
+     "goal": 3,
+     "reward": {
+      "coins": 40
+     }
+    },
+    {
+     "goal": 6,
+     "reward": {
+      "coins": 100
+     }
+    },
+    {
+     "goal": 12,
+     "reward": {
+      "item": "golden_blaster"
+     }
+    }
+   ]
+  },
+  {
+   "id": "boss",
+   "game": "fighter",
+   "name": "Boss Slayer",
+   "desc": "Defeat bosses.",
+   "stat": "bosses",
+   "tiers": [
+    {
+     "goal": 1,
+     "reward": {
+      "coins": 80
+     }
+    },
+    {
+     "goal": 3,
+     "reward": {
+      "item": "armor"
+     }
+    },
+    {
+     "goal": 6,
+     "reward": {
+      "coins": 300,
+      "title": "Boss Slayer"
+     }
+    }
+   ]
+  },
+  {
+   "id": "fchamp",
+   "game": "fighter",
+   "name": "Fighter Champion",
+   "desc": "Finish Fighter levels.",
+   "stat": "fighter_levels",
+   "tiers": [
+    {
+     "goal": 2,
+     "reward": {
+      "coins": 60
+     }
+    },
+    {
+     "goal": 5,
+     "reward": {
+      "coins": 200
+     }
+    },
+    {
+     "goal": 7,
+     "reward": {
+      "coins": 500,
+      "title": "Fighter Champion"
+     }
+    }
+   ]
+  },
+  {
+   "id": "grabber",
+   "game": "runner",
+   "name": "Coin Grabber",
+   "desc": "Collect coins while running.",
+   "stat": "runner_coins",
+   "tiers": [
+    {
+     "goal": 25,
+     "reward": {
+      "coins": 30
+     }
+    },
+    {
+     "goal": 150,
+     "reward": {
+      "item": "coin_magnet"
+     }
+    },
+    {
+     "goal": 500,
+     "reward": {
+      "coins": 250
+     }
+    }
+   ]
+  },
+  {
+   "id": "longhaul",
+   "game": "runner",
+   "name": "Long Haul",
+   "desc": "Run far in one go (meters).",
+   "stat": "runner_best_m",
+   "tiers": [
+    {
+     "goal": 200,
+     "reward": {
+      "coins": 40
+     }
+    },
+    {
+     "goal": 600,
+     "reward": {
+      "item": "extra_heart"
+     }
+    },
+    {
+     "goal": 1500,
+     "reward": {
+      "coins": 300,
+      "title": "Marathoner"
+     }
+    }
+   ]
+  },
+  {
+   "id": "rchamp",
+   "game": "runner",
+   "name": "Runner Champion",
+   "desc": "Finish Runner levels.",
+   "stat": "runner_levels",
+   "tiers": [
+    {
+     "goal": 1,
+     "reward": {
+      "coins": 60
+     }
+    },
+    {
+     "goal": 2,
+     "reward": {
+      "coins": 250,
+      "title": "Runner Champion"
+     }
+    }
+   ]
+  },
+  {
+   "id": "errands",
+   "game": "city",
+   "name": "Errand Runner",
+   "desc": "Finish Erev Shabbos errands.",
+   "stat": "city_errands",
+   "tiers": [
+    {
+     "goal": 5,
+     "reward": {
+      "coins": 40
+     }
+    },
+    {
+     "goal": 25,
+     "reward": {
+      "item": "stopwatch"
+     }
+    },
+    {
+     "goal": 75,
+     "reward": {
+      "coins": 300
+     }
+    }
+   ]
+  },
+  {
+   "id": "speedy",
+   "game": "city",
+   "name": "Speedy Driver",
+   "desc": "Finish with time to spare (seconds).",
+   "stat": "city_best_left",
+   "tiers": [
+    {
+     "goal": 30,
+     "reward": {
+      "coins": 50
+     }
+    },
+    {
+     "goal": 90,
+     "reward": {
+      "item": "turbo_van"
+     }
+    },
+    {
+     "goal": 150,
+     "reward": {
+      "coins": 300,
+      "title": "Gut Shabbos King"
+     }
+    }
+   ]
+  },
+  {
+   "id": "cchamp",
+   "game": "city",
+   "name": "City Champion",
+   "desc": "Win the city level.",
+   "stat": "city_wins",
+   "tiers": [
+    {
+     "goal": 1,
+     "reward": {
+      "coins": 80
+     }
+    },
+    {
+     "goal": 3,
+     "reward": {
+      "coins": 200
+     }
+    },
+    {
+     "goal": 6,
+     "reward": {
+      "coins": 400
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -32,7 +32,7 @@ var y := 0.0
 var floor_y := 0.0
 var vy := 0.0
 var slide_t := 0.0
-var hearts := 3
+var hearts := 3 + (1 if Profile.owns("extra_heart") else 0)
 var coins := 0
 var invuln := 0.0
 var phase := "intro" ## intro, run, caught, over
@@ -660,8 +660,10 @@ func _collide(delta: float) -> void:
 			pickups.erase(pk)
 			continue
 		n2.rotation.y += delta * 5.0
-		if absf(dz2) < 1.0 and absf(n2.position.x - hero.position.x) < 1.1 and absf(n2.position.y - (y + 0.9)) < 1.3:
+		var mag := 2.0 if Profile.owns("coin_magnet") else 1.0
+		if absf(dz2) < mag and absf(n2.position.x - hero.position.x) < 1.1 * mag and absf(n2.position.y - (y + 0.9)) < 1.3:
 			coins += 1
+			Profile.stat_add("runner_coins")
 			n2.queue_free()
 			pickups.erase(pk)
 
@@ -756,6 +758,7 @@ func _commit() -> int:
 	if committed:
 		return 0
 	committed = true
+	Profile.stat_max("runner_best_m", int(dist))
 	var pts := _points()
 	if pts > 0:
 		Profile.add_points(pts)

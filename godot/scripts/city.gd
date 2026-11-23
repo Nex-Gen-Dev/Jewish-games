@@ -114,7 +114,7 @@ var toast_t := 0.0
 func _ready() -> void:
 	cfg = LEVELS.get(level_id, LEVELS["city1"])
 	missions = cfg["missions"]
-	time_total = cfg["time"]
+	time_total = float(cfg["time"]) + (45.0 if Profile.owns("stopwatch") else 0.0)
 	time_left = time_total
 	rng.seed = 424242
 	_environment()
@@ -1441,7 +1441,7 @@ func _drive(mv: Vector2, delta: float) -> void:
 		van_speed += throttle * 22.0 * delta
 	else:
 		van_speed += throttle * 10.0 * delta
-	van_speed = clampf(van_speed, -6.0, 15.0)
+	van_speed = clampf(van_speed, -6.0, 19.0 if Profile.owns("turbo_van") else 15.0)
 	var grip := clampf(absf(van_speed) / 4.0, 0.0, 1.0) * (1.0 if van_speed >= 0.0 else -1.0)
 	van_yaw -= mv.x * 1.9 * grip * delta
 	var heading := Vector3(-sin(van_yaw), 0.0, -cos(van_yaw))
@@ -1624,6 +1624,7 @@ func interact() -> void:
 	if _near_stand():
 		var m: Dictionary = missions[mi]
 		mi += 1
+		Profile.stat_add("city_errands")
 		if mi >= missions.size():
 			_win()
 			return
@@ -1708,6 +1709,8 @@ func _win() -> void:
 	phase = "over"
 	controls.set_act("")
 	Profile.mark_completed(level_id)
+	Profile.stat_add("city_wins")
+	Profile.stat_max("city_best_left", int(time_left))
 	var pts := _commit() + 100
 	Profile.add_points(100)
 	finished.emit(true)

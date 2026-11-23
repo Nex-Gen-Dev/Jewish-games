@@ -21,7 +21,7 @@ var combat_enabled := true ## false in the shul: no fighting there
 
 func _init() -> void:
 	team = 0
-	max_health = 120.0
+	max_health = 120.0 + (30.0 if Profile.owns("armor") else 0.0)
 	move_speed = 6.2
 	look["skin"] = Profile.get_color("character", "skin", look["skin"])
 	look["shirt"] = Profile.get_color("character", "shirt", look["shirt"])
@@ -110,9 +110,9 @@ func _perform(action: String) -> void:
 			if action == "punch":
 				combo += 1
 				combo_timer = 0.7
-				damage_mult = 1.0 if combo < 3 else 1.7
+				damage_mult = (1.0 if combo < 3 else 1.7) * _glove()
 			else:
-				damage_mult = 1.0
+				damage_mult = _glove()
 				combo = 0
 			start_attack(&"punch" if action == "punch" else &"kick")
 			if action == "punch" and combo >= 3:
@@ -125,6 +125,10 @@ func _perform(action: String) -> void:
 				velocity.y = JUMP_SPEED
 		"dodge":
 			start_dodge(desired_move if desired_move.length() > 0.1 else face_dir)
+
+
+func _glove() -> float:
+	return 1.3 if Profile.owns("iron_gloves") else 1.0
 
 
 func _shoot() -> void:
@@ -154,7 +158,7 @@ func _shoot() -> void:
 	face_dir = dir
 	shoot_cd = 0.18 if Profile.owns("rapid") else 0.38
 	shoot_pose = 0.2
-	Projectile.fire(get_parent(), global_position + Vector3(0, 1.35, 0) + dir * 0.9, dir, 0, 8.0, 30.0)
+	Projectile.fire(get_parent(), global_position + Vector3(0, 1.35, 0) + dir * 0.9, dir, 0, 14.0 if Profile.owns("golden_blaster") else 8.0, 30.0)
 
 
 ## Turn toward the nearest enemy so touch players don't need pixel-perfect aim.

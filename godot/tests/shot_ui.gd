@@ -30,6 +30,33 @@ func _ready() -> void:
 	for i in 20:
 		await get_tree().process_frame
 	await _snap(out + "/shop.png")
+	P.data["stats"] = {"kills": 60, "runner_coins": 30, "best_combo": 4, "coins_earned": 400}
+	P.changed.emit()
+	var MedalsS := load("res://scripts/medals.gd")
+	l.call("_show", "medals")
+	for i in 20:
+		await get_tree().process_frame
+	await _snap(out + "/medals.png")
+	var brawler: Dictionary = {}
+	for m in MedalsS.all("fighter"):
+		if m["id"] == "brawler":
+			brawler = m
+	var before: int = P.points()
+	MedalsS.claim(brawler)
+	var ok1: bool = P.points() == before + 40 and MedalsS.claimable(brawler) == 1
+	MedalsS.claim(brawler)
+	print("TEST medal_claim_coins: ", "PASS" if ok1 else "FAIL")
+	print("TEST medal_claim_gear: ", "PASS" if P.owns("iron_gloves") and MedalsS.claimable(brawler) == 0 else "FAIL")
+	print("TEST medal_no_double_claim: ", "PASS" if MedalsS.claim(brawler).is_empty() else "FAIL")
+	print("TEST medal_derived_stat_levels: ", "PASS" if MedalsS.value("levels_done") == 3 and MedalsS.value("fighter_levels") == 2 else "FAIL (%d)" % MedalsS.value("levels_done"))
+	l.call("_show", "medals")
+	for i in 10:
+		await get_tree().process_frame
+	await _snap(out + "/medals2.png")
+	l.call("_show", "shop")
+	for i in 10:
+		await get_tree().process_frame
+	await _snap(out + "/shop2.png")
 	l.call("_show", "settings")
 	for i in 20:
 		await get_tree().process_frame
@@ -42,6 +69,11 @@ func _ready() -> void:
 	for i in 60:
 		await get_tree().process_frame
 	await _snap(out + "/hub_levels.png")
+	l.set("hub_tab", "medals")
+	l.call("_hub_render")
+	for i in 20:
+		await get_tree().process_frame
+	await _snap(out + "/hub_medals.png")
 	l.set("hub_tab", "howto")
 	l.call("_hub_render")
 	for i in 20:
