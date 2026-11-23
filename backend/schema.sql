@@ -15,3 +15,4 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, title TEXT, body TEXT, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS legal (id INTEGER PRIMARY KEY CHECK (id = 1), version INTEGER, terms TEXT, privacy TEXT, updated INTEGER);
+CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT); -- auto_beta: '1' makes new players beta testers
