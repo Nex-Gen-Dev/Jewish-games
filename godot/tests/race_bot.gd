@@ -165,8 +165,27 @@ func _gears(delta: float) -> void:
 		print("t=%.1f sel=%d gear=%s speed=%.1f m/s rpm=%.2f" % [elapsed, c.gear_sel, p.gear_text(), p.fwd_speed(), p.rpm])
 
 
+func _stats() -> void:
+	var rss := 0
+	var f := FileAccess.open("/proc/self/status", FileAccess.READ)
+	if f:
+		for ln in f.get_as_text().split("\n"):
+			if ln.begins_with("VmRSS"):
+				rss = int(ln.get_slice(":", 1).strip_edges().get_slice(" ", 0)) / 1024
+	print("STATS t=%.0f rssMB=%d staticMB=%d vramMB=%d texMB=%d nodes=%d objs=%d prims=%d draws=%d" % [elapsed, rss,
+		int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0),
+		int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0),
+		int(Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0),
+		int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)),
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))])
+
+
 func _physics_process(delta: float) -> void:
 	elapsed += delta
+	if "--stats" in OS.get_cmdline_user_args() and int(elapsed * 60.0) % 300 == 0:
+		_stats()
 	if scene == "gears":
 		_gears(delta)
 		return

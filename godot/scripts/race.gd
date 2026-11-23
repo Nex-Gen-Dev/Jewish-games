@@ -4,6 +4,7 @@ extends Node3D
 
 signal finished(win: bool)
 
+const AppLog := preload("res://scripts/applog.gd")
 const TrackScript := preload("res://scripts/race_track.gd")
 const VehicleScript := preload("res://scripts/race_vehicle.gd")
 const ControlsScript := preload("res://scripts/race_controls.gd")
@@ -31,6 +32,7 @@ const PRESETS := {
 
 var level_id := "race1"
 var app: Node
+var tier := 1
 var cfg: Dictionary
 var tr
 var world: Node3D
@@ -78,23 +80,53 @@ func _ready() -> void:
 	cfg = LEVELS.get(level_id, LEVELS["race1"])
 	rng.seed = 2026
 	_environment()
+	AppLog.sample("race load: sky and light")
 	world = Node3D.new()
 	add_child(world)
 	tr = TrackScript.new()
+	tier = _gfx_tier()
+	AppLog.sample("race load: start (graphics tier %d)" % tier)
+	var t0 := Time.get_ticks_msec()
 	tr.build_level(level_id)
-	tr.build(world, Profile.quality_high())
+	var t1 := Time.get_ticks_msec()
+	tr.build(world, tier)
+	AppLog.sample("race load: track built")
+	print("race: TIMING level_script=%d ms mesh_build=%d ms" % [t1 - t0, Time.get_ticks_msec() - t1])
 	print("race: %s samples=%d length=%.0f m" % [level_id, tr.n, tr.length])
 	_labels()
 	_camera()
 	_racers()
+	AppLog.sample("race load: racers placed")
 	_fx_pool()
 	_build_ui()
+	AppLog.sample("race load: ui built")
+	_load_samples()
 	get_tree().root.size_changed.connect(_camera)
 	goal = tr.length * float(cfg["laps"]) if tr.closed else tr.dist[tr.finish_idx]
 	_banner(cfg["title"], cfg["intro"], 2.6)
 	phase = "intro"
 	count_t = 0.0
 	_follow(1.0, true)
+
+
+## 0 light, 1 phone, 2 desktop. A race that ended in a crash switches itself to light for next time.
+func _gfx_tier() -> int:
+	if OS.get_environment("RACE_TIER") != "":
+		return int(OS.get_environment("RACE_TIER")) ## tests only
+	var crashed: bool = str(AppLog.previous_crash.get("level", "")).begins_with("race")
+	if crashed and not bool(Profile.get_setting("race_light", false)):
+		Profile.set_setting("race_light", true)
+	if bool(Profile.get_setting("race_light", false)):
+		return 0
+	return 2 if Profile.quality_high() else 1
+
+
+func _load_samples() -> void:
+	await get_tree().process_frame
+	AppLog.sample("race load: frame 1")
+	for k in 40:
+		await get_tree().process_frame
+	AppLog.sample("race load: frame 41")
 
 
 func _notification(what: int) -> void:
@@ -157,7 +189,7 @@ func _camera() -> void:
 	if cam == null:
 		cam = Camera3D.new()
 		cam.current = true
-		cam.far = 540.0
+		cam.far = [260.0, 340.0, 540.0][tier]
 		cam.near = 0.1
 		add_child(cam)
 	var vs := get_viewport().get_visible_rect().size
@@ -172,10 +204,10 @@ func _labels() -> void:
 		var i: int = g[0]
 		var lab := Label3D.new()
 		lab.text = "%s  SHTICK RACING" % g[1] if g[1] == "START" else "FINISH"
-		lab.font_size = 96
-		lab.pixel_size = 0.028
+		lab.font_size = 96 if tier == 2 else 40
+		lab.pixel_size = 0.028 if tier == 2 else 0.067
 		lab.modulate = Color("#ffd34a")
-		lab.outline_size = 24
+		lab.outline_size = 24 if tier == 2 else 6
 		lab.outline_modulate = Color(0.1, 0.1, 0.12)
 		var h := 11.4 if tr.boat else 9.4
 		lab.position = tr.pos[i] + Vector3(0, h + 3.2, 0)
@@ -186,6 +218,8 @@ func _labels() -> void:
 func _racers() -> void:
 	var is_boat: bool = cfg["boat"]
 	var rows := [[0, -1.0], [0, 1.0], [1, -1.0], [1, 1.0], [2, -1.0], [2, 1.0]]
+	if tier == 0:
+		rows = rows.slice(0, 4) ## light graphics: 3 rivals instead of 5
 	var lat_w := 3.4
 	if is_boat:
 		lat_w = 9.0
@@ -227,7 +261,7 @@ func _fx_pool() -> void:
 			var d := Vector2(px - 23.5, py - 23.5).length() / 24.0
 			img.set_pixel(px, py, Color(1, 1, 1, pow(clampf(1.0 - d, 0.0, 1.0), 0.8)))
 	var puff_tex := ImageTexture.create_from_image(img)
-	for k in 90:
+	for k in [28, 50, 90][tier]:
 		var mi := MeshInstance3D.new()
 		mi.mesh = qm
 		var mt := StandardMaterial3D.new()
@@ -500,6 +534,9 @@ func _pause(on: bool) -> void:
 			["Camera: " + views[view_mode], func():
 				_cycle_view()
 				_pause(true)],
+			["Graphics: " + ("Light" if tier == 0 else "Normal"), func():
+				Profile.set_setting("race_light", tier != 0)
+				app.start_level(level_id)],
 			["Back on track", func():
 				player.respawn(tr)
 				_pause(false)],

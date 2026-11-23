@@ -87,6 +87,7 @@ class MB:
 	var nn := PackedVector3Array()
 	var c := PackedColorArray()
 	var uv := PackedVector2Array()
+	var skip_bottom := false ## light graphics: no undersides of boxes
 
 	func tri(a: Vector3, b: Vector3, d: Vector3, n_out: Vector3, col: Color, ua := Vector2.ZERO, ub := Vector2.ZERO, ud := Vector2.ZERO) -> void:
 		var cr := (b - a).cross(d - a)
@@ -132,7 +133,8 @@ class MB:
 		var ex: Vector3 = bs * Vector3.RIGHT
 		var ez: Vector3 = bs * Vector3.BACK
 		quad(p[4], p[5], p[7], p[6], Vector3.UP, col.lightened(0.06))
-		quad(p[0], p[1], p[3], p[2], Vector3.DOWN, side)
+		if not skip_bottom:
+			quad(p[0], p[1], p[3], p[2], Vector3.DOWN, side)
 		quad(p[1], p[5], p[7], p[3], ex, side)
 		quad(p[0], p[4], p[6], p[2], -ex, side)
 		quad(p[2], p[3], p[7], p[6], ez, side)
@@ -648,6 +650,7 @@ func _mb(i: int, water := false) -> MB:
 	var key := (i / CHUNK) * 2 + (1 if water else 0)
 	if not _chunks.has(key):
 		_chunks[key] = MB.new()
+		_chunks[key].skip_bottom = tier < 2
 	return _chunks[key]
 
 
@@ -727,7 +730,11 @@ func _ext(i: int, side: float, th: int) -> Vector2:
 	return Vector2(pp, ss)
 
 
-func build(parent: Node3D, high: bool) -> void:
+var tier := 2 ## 0 = light (after a crash or by choice), 1 = phones, 2 = desktop
+
+
+func build(parent: Node3D, tier_in: int) -> void:
+	tier = tier_in
 	_rng.seed = 424242
 	_chunks.clear()
 	_build_grid()
@@ -742,11 +749,19 @@ func build(parent: Node3D, high: bool) -> void:
 	var segs := n if closed else n - 1
 	for i in segs:
 		_segment(i)
-	_scenery(high)
+	_scenery(tier == 2)
 	var total_v := 0
 	for key in _chunks.keys():
 		var mbk: MB = _chunks[key]
 		total_v += mbk.v.size()
+		var bad := 0
+		for q in mbk.v.size():
+			var pv: Vector3 = mbk.v[q]
+			var nv: Vector3 = mbk.nn[q]
+			if not (is_finite(pv.x) and is_finite(pv.y) and is_finite(pv.z) and is_finite(nv.x) and is_finite(nv.y) and is_finite(nv.z)):
+				bad += 1
+		if bad > 0:
+			print("race_track: NONFINITE chunk %d bad=%d" % [key, bad])
 		var is_w: bool = (key % 2) == 1
 		var am := mbk.mesh(_mat_water if is_w else _mat_solid)
 		if am == null:
@@ -754,7 +769,7 @@ func build(parent: Node3D, high: bool) -> void:
 		var mi := MeshInstance3D.new()
 		mi.mesh = am
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.visibility_range_end = 470.0
+		mi.visibility_range_end = [220.0, 330.0, 470.0][tier]
 		parent.add_child(mi)
 	print("race_track: vertices=%d chunks=%d" % [total_v, _chunks.size()])
 	# the ground, far below
@@ -764,7 +779,8 @@ func build(parent: Node3D, high: bool) -> void:
 	var hs := 3000.0
 	var g := Vector3(cx, y_ground, cz)
 	gm.quad(g + Vector3(-hs, 0, -hs), g + Vector3(hs, 0, -hs), g + Vector3(hs, 0, hs), g + Vector3(-hs, 0, hs), Vector3.UP, ground_col)
-	_far_hills(gm, cx, cz)
+	if tier == 2:
+		_far_hills(gm, cx, cz)
 	var gmi := MeshInstance3D.new()
 	gmi.mesh = gm.mesh(_mat_solid)
 	gmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -830,7 +846,7 @@ func _segment(i: int) -> void:
 			var up := Vector3(0, 0.03, 0)
 			mb.quad(pa - e1 + up, pa - e2 + up, pb - e2b + up, pb - e1b + up, Vector3.UP, Color("#e8e8e0"))
 			mb.quad(pa + e2 + up, pa + e1 + up, pb + e1b + up, pb + e2b + up, Vector3.UP, Color("#e8e8e0"))
-			if (i / 3) % 2 == 0 and wid[i] > 9.0:
+			if tier == 2 and (i / 3) % 2 == 0 and wid[i] > 9.0:
 				var cw := rgt[i] * 0.16
 				var cwb := rgt[j] * 0.16
 				mb.quad(pa - cw + up, pa + cw + up, pb + cwb + up, pb - cwb + up, Vector3.UP, Color("#f4f0e0"))
@@ -872,7 +888,7 @@ func _segment(i: int) -> void:
 		var jit := _jit(i, 0.05)
 		if hh_a > 4.0:
 			# strata bands
-			var bands := 3
+			var bands := 3 if tier == 2 else 1
 			for b in bands:
 				var f0 := float(b) / bands
 				var f1 := float(b + 1) / bands
@@ -904,6 +920,10 @@ func _building(mb: MB, i: int, side: float, off: float, depth: float, along: flo
 	# dark window bands on the side that faces the track
 	var face := c - rgt[i] * side * (depth * 0.5 + 0.06)
 	var bands := clampi(int(ht / 7.0), 1, 4)
+	if tier == 0:
+		bands = 0
+	elif tier == 1:
+		bands = mini(bands, 1)
 	for b in bands:
 		var by := ht * (0.2 + 0.7 * float(b) / maxf(bands, 1))
 		mb.box(face + Vector3(0, by, 0), Vector3(0.14, 1.7, along * 0.86), yaw, Color("#3a4a5c"), 1.0)
@@ -936,14 +956,16 @@ func _buoy(mb: MB, p: Vector3, col: Color) -> void:
 	mb.pyramid(p + Vector3(0, 1.2, 0), 0.7, 1.2, 6, Color("#f4f4f0"), 0.0, 0.1)
 
 
-func _scenery(high: bool) -> void:
+func _scenery(_high: bool) -> void:
 	var r := _rng
+	var skip: int = [4, 2, 1][tier] ## fewer buildings, trees and rocks on weak phones
 	for i in n:
 		var th := thm[i]
 		var mb := _mb(i)
 		var fl := flg[i]
 		var in_gap := (fl & F_GAP) != 0
-		match th:
+		var th_obj: int = th if (i % skip) == 0 else -1
+		match th_obj:
 			T_LAKE:
 				if i % 4 == 0 and boat and not in_gap:
 					var off := wid[i] * 0.5 - 4.0
