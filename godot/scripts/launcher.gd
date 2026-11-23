@@ -1309,6 +1309,9 @@ func _hub_options(parent: Control, game: Dictionary) -> void:
 			_segment(c, "Walking controls", ["Joystick", "D-pad", "Tilt"], int(Profile.get_setting("controls", 0)), func(i): Profile.set_setting("controls", i), _hub_render)
 			_segment(c, "Car and boat steering", ["Tilt", "Slide", "Arrows", "D-pad"], int(Profile.get_setting("drive_controls", 2)), func(i): Profile.set_setting("drive_controls", i), _hub_render)
 			_label(c, "In a car or boat you always get a GAS and a BRAKE pedal on the right. Tilt: tilt the phone to steer. Slide: slide your thumb on the bar. Arrows: two steering buttons. D-pad: a cross pad (up is gas, down is brake). The VIEW button switches between chase, driver's seat and hood cameras.", 12, FAINT)
+		"race":
+			_segment(c, "Steering", ["Wheel", "Arrows", "Tilt"], int(Profile.get_setting("race_controls", 0)), func(i): Profile.set_setting("race_controls", i), _hub_render)
+			_label(c, "Wheel: drag the big steering wheel with your thumb, it springs back when you let go. Arrows: two steering buttons. Tilt: tilt the phone. GAS, BRAKE and the gear shifter (R N D, or manual 1 to 5) are always on the right. Tap AUTO on the shifter to switch to manual gears.", 12, FAINT)
 		_:
 			_label(c, "This game has no special controls to set.", 13, DIM)
 	var quals := ["auto", "low", "high"]
