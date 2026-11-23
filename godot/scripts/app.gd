@@ -23,7 +23,14 @@ func _ready() -> void:
 	cloud.name = "Cloud"
 	add_child(cloud)
 	if not AppLog.previous_crash.is_empty() and Profile.has_account():
-		cloud.send_report("crash", "The app closed unexpectedly during level '%s'." % AppLog.previous_crash["level"])
+		cloud.send_report("crash", "The app closed unexpectedly during level '%s'.%s" % [AppLog.previous_crash["level"], AppLog.crash_summary()])
+	var memt := Timer.new() ## memory readings for crash reports (see AppLog.sample)
+	memt.wait_time = 2.0
+	memt.timeout.connect(func():
+		if AppLog.active:
+			AppLog.sample())
+	add_child(memt)
+	memt.start()
 	Engine.max_fps = 60
 	var args := OS.get_cmdline_user_args()
 	for a in args:
